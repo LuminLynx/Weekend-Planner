@@ -1,0 +1,30 @@
+app:
+  currency: "EUR"
+  locale: "en_GB"
+  price_drop_days_threshold: 5
+  price_drop_low_inventory_bonus: 0.25
+  price_drop_high_inventory_penalty: -0.1
+  cache_dir: "~/.weekend-planner/cache"
+connectors:
+  ticket_vendor_a:
+    base_url: "https://example.com/api/vendor_a/events"
+    page_size: 50
+    timeout_seconds: 6
+    retries: 2
+  ticket_vendor_b:
+    base_url: "https://example.com/api/vendor_b/events"
+    page_size: 50
+    timeout_seconds: 6
+    retries: 2
+  dining:
+    base_url: "https://example.com/api/dining"
+    timeout_seconds: 5
+    retries: 2
+fx:
+  base_url: "https://api.exchangerate.host/latest"
+  base_currency: "EUR"
+  fallback_rates:
+    EUR: 1.0
+    USD: 1.08
+    GBP: 0.86
+    SEK: 11.5
