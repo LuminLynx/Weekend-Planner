@@ -1,0 +1,123 @@
+
+from fastapi import FastAPI, Query
+from fastapi.responses import JSONResponse, HTMLResponse
+import asyncio, yaml, json, httpx
+from .connectors import ticket_vendor_a, ticket_vendor_b, fx as fx_api, dining as dining_api
+from .normalizers.price import compute_landed
+from .ranking.scorer import budget_aware_score
+from .ui.copy import templates as tpl
+
+app = FastAPI(title="Weekend Planner API")
+
+@app.get("/healthz")
+async def health():
+    return {"ok": True}
+
+@app.get("/plan")
+async def plan(date: str = Query(..., description="YYYY-MM-DD"),
+               budget: float = Query(30.0, description="Budget per person"),
+               with_dining: bool = Query(True, description="Include dining suggestions")):
+    event = {
+        "title": "Indie Concert",
+        "start_ts": f"{date}T20:30:00Z",
+        "venue": {"lat": 38.709, "lng": -9.133, "address": "Lisbon"}
+    }
+    async with httpx.AsyncClient(timeout=10) as session:
+        fx_rates = await fx_api.get_fx_rates("https://api.exchangerate.host/latest")
+        offers = []
+        for get_offers in (ticket_vendor_a.get_offers, ticket_vendor_b.get_offers):
+            offers.extend(await get_offers(session, event))
+
+        cfg = yaml.safe_load(open("app/config/settings.example.yaml"))
+        items = []
+        for offer in offers:
+            landed, breakdown = compute_landed(
+                offer, user_currency=cfg["currency"], fx_rates=fx_rates,
+                vat_fallback_rate=cfg["pricing"]["vat_fallback_rate"],
+                promo_rules=cfg["pricing"]["promo_rules"]
+            )
+            prob = 0.18 if offer["provider"] == "a" else 0.46  # placeholder
+            buy_now = (prob < cfg["model"]["price_drop_threshold"]) or True
+            dining_choice = None
+            if with_dining:
+                near = await dining_api.get_nearby(event["venue"])
+                dining_choice = near[0] if near else None
+            score = budget_aware_score(
+                base_score=0.7,
+                landed_cost=landed["amount"],
+                user_budget_pp=budget,
+                price_drop_prob_7d=prob,
+                days_to_event=5,
+                dining_est_pp=(dining_choice or {}).get("est_pp", 0.0)
+            )
+            items.append({
+                "event_title": event["title"],
+                "start_ts": event["start_ts"],
+                "best_price": {
+                    "landed": landed, "breakdown": breakdown, "provider": offer["provider"],
+                    "price_drop_prob_7d": prob, "buy_now": buy_now, "url": offer.get("url")
+                },
+                "meal_bundle": {"chosen": dining_choice} if dining_choice else None,
+                "score": score,
+                "rationale": tpl.itinerary_copy(
+                    event["title"], event["start_ts"], landed["amount"], landed["currency"],
+                    offer["provider"], prob, buy_now,
+                    (dining_choice or {}).get("name"), (dining_choice or {}).get("est_pp")
+                )
+            })
+
+        top = sorted(items, key=lambda r: r["score"], reverse=True)[:3]
+        return JSONResponse({"itineraries": top})
+
+INDEX_HTML = """
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Weekend Planner</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; line-height: 1.4; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    input, button { font-size: 16px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
+    button { background: #111; color: white; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .muted { color: #666; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h2>Weekend Planner (Budget First)</h2>
+  <div class="row">
+    <label>Date: <input id="date" type="date"/></label>
+    <label>Budget (pp): <input id="budget" type="number" value="30" step="1"/></label>
+    <label><input id="dining" type="checkbox" checked/> Dining</label>
+    <button onclick="run()">Plan</button>
+  </div>
+  <div id="out" style="margin-top:16px;"></div>
+  <p class="muted">Tip: Works well on phones/tablets. No login needed.</p>
+  <script>
+    async function run() {
+      const d = document.getElementById('date').value;
+      const b = document.getElementById('budget').value || 30;
+      const w = document.getElementById('dining').checked;
+      if (!d) { alert('Pick a date'); return; }
+      const res = await fetch(`/plan?date=${encodeURIComponent(d)}&budget=${encodeURIComponent(b)}&with_dining=${w}`);
+      const js = await res.json();
+      const div = document.getElementById('out');
+      div.innerHTML = '';
+      js.itineraries.forEach(it => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.innerHTML = `<b>${it.event_title}</b> — ${it.start_ts}<br/>` +
+          `${it.rationale}<br/>` +
+          `<div class="muted">Provider: ${it.best_price.provider} · Total: ${it.best_price.landed.amount} ${it.best_price.landed.currency}</div>`;
+        div.appendChild(el);
+      });
+    }
+  </script>
+</body>
+</html>
+"""
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    return HTMLResponse(INDEX_HTML)
