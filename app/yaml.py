@@ -10,16 +10,24 @@ apis:
       base_url: \"https://api.vendor-a.example\"
       token: \"VENDOR_A_TOKEN\"
       includes_vat_default: true
+      timeout_seconds: 10
+      cache_ttl_seconds: 300  # 5 minutes
     vendor_b:
       base_url: \"https://api.vendor-b.example\"
       token: \"VENDOR_B_TOKEN\"
       includes_vat_default: false
+      timeout_seconds: 10
+      cache_ttl_seconds: 300  # 5 minutes
   fx:
     provider: \"ecb\"
     base_url: \"https://api.exchangerate.host/latest\"
+    timeout_seconds: 10
+    cache_ttl_seconds: 3600  # 1 hour
   dining:
     base_url: \"https://api.opentable.example\"
     token: \"DINING_TOKEN\"
+    timeout_seconds: 5
+    cache_ttl_seconds: 900  # 15 minutes
 
 pricing:
   vat_fallback_rate: 0.23
@@ -48,20 +56,28 @@ _PARSED = {
                 "base_url": "https://api.vendor-a.example",
                 "token": "VENDOR_A_TOKEN",
                 "includes_vat_default": True,
+                "timeout_seconds": 10,
+                "cache_ttl_seconds": 300,
             },
             "vendor_b": {
                 "base_url": "https://api.vendor-b.example",
                 "token": "VENDOR_B_TOKEN",
                 "includes_vat_default": False,
+                "timeout_seconds": 10,
+                "cache_ttl_seconds": 300,
             },
         },
         "fx": {
             "provider": "ecb",
             "base_url": "https://api.exchangerate.host/latest",
+            "timeout_seconds": 10,
+            "cache_ttl_seconds": 3600,
         },
         "dining": {
             "base_url": "https://api.opentable.example",
             "token": "DINING_TOKEN",
+            "timeout_seconds": 5,
+            "cache_ttl_seconds": 900,
         },
     },
     "pricing": {
@@ -95,3 +111,4 @@ def safe_load(stream):
     if data.strip() != _RAW.strip():
         raise ValueError("This stub YAML loader only understands the provided settings.example.yaml content.")
     return deepcopy(_PARSED)
+

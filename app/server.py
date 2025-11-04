@@ -53,8 +53,9 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
                 inventory_hint=offer.get("inventory_hint", "med")
             )
             dining_choice = None
+            dining_cache_hit = False
             if with_dining:
-                near = await dining_api.get_nearby(event["venue"])
+                near, dining_cache_hit = await dining_api.get_nearby(event["venue"])
                 dining_choice = near[0] if near else None
             score = budget_aware_score(
                 base_score=0.7,
@@ -100,7 +101,7 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
                     "fx_source": fx_source,
                     "cache": {
                         "fx_hit": fx_source in ("cached_last_good",),
-                        "dining_hit": False  # placeholder
+                        "dining_hit": dining_cache_hit
                     },
                     "breakdown": breakdown,
                     "scoring": {

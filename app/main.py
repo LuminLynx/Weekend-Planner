@@ -49,7 +49,7 @@ async def run(city: str, date_iso: str, budget_pp: float, with_dining: bool):
             )
             dining_choice = None
             if with_dining:
-                near = await dining_api.get_nearby(event["venue"])
+                near, _ = await dining_api.get_nearby(event["venue"])
                 dining_choice = near[0] if near else None
             score = budget_aware_score(
                 base_score=0.7,

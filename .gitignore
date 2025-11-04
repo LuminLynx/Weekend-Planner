@@ -43,4 +43,5 @@ Thumbs.db
 # Application specific
 app/models/price_drop/model.bin
 fx_last_good.json
+.cache/
 *.log
