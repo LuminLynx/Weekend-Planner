@@ -2,33 +2,41 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse, HTMLResponse
 import asyncio, yaml, json, httpx
+from datetime import datetime
 from .connectors import ticket_vendor_a, ticket_vendor_b, fx as fx_api, dining as dining_api
 from .normalizers.price import compute_landed
 from .ranking.scorer import budget_aware_score
+from .policies.buy_now import buy_now_policy
 from .ui.copy import templates as tpl
+from .utils.logging import log_itinerary
 
 app = FastAPI(title="Weekend Planner API")
 
-@app.get("/healthz")
-async def health():
-    return {"ok": True}
+def _days_to_event(start_ts: str) -> int:
+    """Calculate days from now until event"""
+    try:
+        event_dt = datetime.fromisoformat(start_ts.replace("Z", "+00:00"))
+        now = datetime.now(event_dt.tzinfo)
+        return max(0, (event_dt - now).days)
+    except Exception:
+        return 5  # fallback
 
-@app.get("/plan")
-async def plan(date: str = Query(..., description="YYYY-MM-DD"),
-               budget: float = Query(30.0, description="Budget per person"),
-               with_dining: bool = Query(True, description="Include dining suggestions")):
+async def _generate_itineraries(date: str, budget: float, with_dining: bool, debug: bool = False):
+    """Generate itineraries with optional debug info"""
     event = {
         "title": "Indie Concert",
         "start_ts": f"{date}T20:30:00Z",
         "venue": {"lat": 38.709, "lng": -9.133, "address": "Lisbon"}
     }
     async with httpx.AsyncClient(timeout=10) as session:
-        fx_rates = await fx_api.get_fx_rates("https://api.exchangerate.host/latest")
+        fx_rates, fx_source = await fx_api.get_fx_rates("https://api.exchangerate.host/latest")
         offers = []
         for get_offers in (ticket_vendor_a.get_offers, ticket_vendor_b.get_offers):
             offers.extend(await get_offers(session, event))
 
         cfg = yaml.safe_load(open("app/config/settings.example.yaml"))
+        days_to_event = _days_to_event(event["start_ts"])
+        
         items = []
         for offer in offers:
             landed, breakdown = compute_landed(
@@ -37,20 +45,42 @@ async def plan(date: str = Query(..., description="YYYY-MM-DD"),
                 promo_rules=cfg["pricing"]["promo_rules"]
             )
             prob = 0.18 if offer["provider"] == "a" else 0.46  # placeholder
-            buy_now = (prob < cfg["model"]["price_drop_threshold"]) or True
+            buy_now, buy_reason = buy_now_policy(
+                prob=prob,
+                days_to_event=days_to_event,
+                threshold=cfg["model"]["price_drop_threshold"],
+                min_days_force_buy=cfg["model"]["min_days_force_buy"],
+                inventory_hint=offer.get("inventory_hint", "med")
+            )
             dining_choice = None
+            dining_cache_hit = False
             if with_dining:
-                near = await dining_api.get_nearby(event["venue"])
+                near, dining_cache_hit = await dining_api.get_nearby(event["venue"])
                 dining_choice = near[0] if near else None
             score = budget_aware_score(
                 base_score=0.7,
                 landed_cost=landed["amount"],
                 user_budget_pp=budget,
                 price_drop_prob_7d=prob,
-                days_to_event=5,
+                days_to_event=days_to_event,
                 dining_est_pp=(dining_choice or {}).get("est_pp", 0.0)
             )
-            items.append({
+            
+            # Structured logging for observability
+            log_itinerary(
+                provider=offer["provider"],
+                landed_amount=landed["amount"],
+                currency=landed["currency"],
+                fx_source=fx_source,
+                cache_fx=fx_source == "cached_last_good",
+                buy_now=buy_now,
+                reason=buy_reason,
+                score=score,
+                days_to_event=days_to_event,
+                price_drop_prob=prob
+            )
+            
+            item = {
                 "event_title": event["title"],
                 "start_ts": event["start_ts"],
                 "best_price": {
@@ -64,10 +94,50 @@ async def plan(date: str = Query(..., description="YYYY-MM-DD"),
                     offer["provider"], prob, buy_now,
                     (dining_choice or {}).get("name"), (dining_choice or {}).get("est_pp")
                 )
-            })
+            }
+            
+            if debug:
+                item["debug"] = {
+                    "fx_source": fx_source,
+                    "cache": {
+                        "fx_hit": fx_source == "cached_last_good",
+                        "dining_hit": dining_cache_hit
+                    },
+                    "breakdown": breakdown,
+                    "scoring": {
+                        "base_score": 0.7,
+                        "landed_cost": landed["amount"],
+                        "user_budget": budget,
+                        "price_drop_prob": prob,
+                        "days_to_event": days_to_event,
+                        "dining_est": (dining_choice or {}).get("est_pp", 0.0)
+                    },
+                    "buy_now_reason": buy_reason,
+                    "inventory_hint": offer.get("inventory_hint", "med")
+                }
+            
+            items.append(item)
 
         top = sorted(items, key=lambda r: r["score"], reverse=True)[:3]
-        return JSONResponse({"itineraries": top})
+        return {"itineraries": top}
+
+@app.get("/healthz")
+async def health():
+    return {"ok": True}
+
+@app.get("/plan")
+async def plan(date: str = Query(..., description="YYYY-MM-DD"),
+               budget: float = Query(30.0, description="Budget per person"),
+               with_dining: bool = Query(True, description="Include dining suggestions")):
+    result = await _generate_itineraries(date, budget, with_dining, debug=False)
+    return JSONResponse(result)
+
+@app.get("/plan/debug")
+async def plan_debug(date: str = Query(..., description="YYYY-MM-DD"),
+                     budget: float = Query(30.0, description="Budget per person"),
+                     with_dining: bool = Query(True, description="Include dining suggestions")):
+    result = await _generate_itineraries(date, budget, with_dining, debug=True)
+    return JSONResponse(result)
 
 INDEX_HTML = """
 <!doctype html>

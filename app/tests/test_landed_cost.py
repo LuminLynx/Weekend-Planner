@@ -1,13 +1,21 @@
 
+import pytest
 import yaml
 from app.normalizers.price import compute_landed
 
-def test_vat_fees_promo_fx():
+
+@pytest.fixture
+def config():
+    """Load config fixture for tests"""
+    with open("app/config/settings.example.yaml") as f:
+        return yaml.safe_load(f)
+
+
+def test_vat_fees_promo_fx(config):
     user_cur = "EUR"
     fx = {"EUR": 1.0, "USD": 1.08}  # 1 EUR = 1.08 USD
-    cfg = yaml.safe_load(open("app/config/settings.example.yaml"))
-    vat_fallback = cfg["pricing"]["vat_fallback_rate"]
-    promos = cfg["pricing"]["promo_rules"]
+    vat_fallback = config["pricing"]["vat_fallback_rate"]
+    promos = config["pricing"]["promo_rules"]
 
     # Vendor A: EUR, VAT included, service fees, percent promo
     offer_a = {
