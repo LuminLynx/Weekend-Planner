@@ -8,6 +8,7 @@ from .normalizers.price import compute_landed
 from .ranking.scorer import budget_aware_score
 from .policies.buy_now import buy_now_policy
 from .ui.copy import templates as tpl
+from .utils.logging import log_itinerary
 
 app = FastAPI(title="Weekend Planner API")
 
@@ -62,6 +63,20 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
                 price_drop_prob_7d=prob,
                 days_to_event=days_to_event,
                 dining_est_pp=(dining_choice or {}).get("est_pp", 0.0)
+            )
+            
+            # Structured logging for observability
+            log_itinerary(
+                provider=offer["provider"],
+                landed_amount=landed["amount"],
+                currency=landed["currency"],
+                fx_source=fx_source,
+                cache_fx=fx_source in ("cached_last_good",),
+                buy_now=buy_now,
+                reason=buy_reason,
+                score=score,
+                days_to_event=days_to_event,
+                price_drop_prob=prob
             )
             
             item = {
