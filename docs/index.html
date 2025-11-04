@@ -104,6 +104,10 @@
             margin-top: 30px;
         }
         
+        .cta-section h2 {
+            margin-bottom: 20px;
+        }
+        
         .btn {
             display: inline-block;
             padding: 15px 30px;
@@ -187,7 +191,12 @@
             <div class="section">
                 <h2>Quick Start</h2>
                 <p>Install and run Weekend Planner with these simple commands:</p>
-                <div class="code-block">pip install -e .<br>pytest -q<br>python app/main.py --date 2025-11-02 --budget-pp 30 --with-dining<br><br># Or run as a web app:<br>uvicorn app.server:app --host 0.0.0.0 --port 8000</div>
+                <pre class="code-block"><code>pip install -e .
+pytest -q
+python app/main.py --date 2025-11-02 --budget-pp 30 --with-dining
+
+# Or run as a web app:
+uvicorn app.server:app --host 0.0.0.0 --port 8000</code></pre>
             </div>
             
             <div class="section">
@@ -203,7 +212,7 @@
             </div>
             
             <div class="cta-section">
-                <h2 style="margin-bottom: 20px;">Get Started</h2>
+                <h2>Get Started</h2>
                 <a href="https://github.com/LuminLynx/Weekend-Planner" class="btn">View on GitHub</a>
                 <a href="https://github.com/LuminLynx/Weekend-Planner#readme" class="btn">Documentation</a>
             </div>
