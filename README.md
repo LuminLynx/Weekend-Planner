@@ -3,6 +3,8 @@
 Generates 1–3 weekend options optimized for **total landed cost** with a transparent breakdown
 (base, fees, VAT, promos, FX). Optionally bundles a nearby dining suggestion.
 
+📄 **[View Project Website](https://luminlynx.github.io/Weekend-Planner/)**
+
 ## Quickstart
 ```bash
 pip install -e .
