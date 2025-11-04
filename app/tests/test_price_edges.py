@@ -1,15 +1,22 @@
 
+import pytest
 import yaml
 from app.normalizers.price import compute_landed
 
 
-def test_mixed_currency_fees():
+@pytest.fixture
+def config():
+    """Load config fixture for tests"""
+    with open("app/config/settings.example.yaml") as f:
+        return yaml.safe_load(f)
+
+
+def test_mixed_currency_fees(config):
     """Test handling of fees in different currencies"""
     user_cur = "EUR"
     fx = {"EUR": 1.0, "USD": 1.08, "GBP": 0.85}
-    cfg = yaml.safe_load(open("app/config/settings.example.yaml"))
-    vat_fallback = cfg["pricing"]["vat_fallback_rate"]
-    promos = cfg["pricing"]["promo_rules"]
+    vat_fallback = config["pricing"]["vat_fallback_rate"]
+    promos = config["pricing"]["promo_rules"]
     
     # Base price in EUR, but fee in USD
     offer = {
@@ -27,12 +34,11 @@ def test_mixed_currency_fees():
     assert abs(breakdown["fees"] - 3.0) < 0.01
 
 
-def test_promo_floor_prevents_negative():
+def test_promo_floor_prevents_negative(config):
     """Test that promo cannot reduce total below 0"""
     user_cur = "EUR"
     fx = {"EUR": 1.0}
-    cfg = yaml.safe_load(open("app/config/settings.example.yaml"))
-    vat_fallback = cfg["pricing"]["vat_fallback_rate"]
+    vat_fallback = config["pricing"]["vat_fallback_rate"]
     
     # Create a promo that would exceed the total
     huge_promo_rules = {
@@ -55,11 +61,10 @@ def test_promo_floor_prevents_negative():
     assert landed["amount"] == 0.0
 
 
-def test_vat_fallback_used():
+def test_vat_fallback_used(config):
     """Test that VAT fallback is used when vat_rate is None"""
     user_cur = "EUR"
     fx = {"EUR": 1.0}
-    cfg = yaml.safe_load(open("app/config/settings.example.yaml"))
     vat_fallback = 0.23
     promos = {}
     
@@ -75,13 +80,12 @@ def test_vat_fallback_used():
     assert abs(breakdown["vat"] - 23.0) < 0.01
 
 
-def test_mixed_currency_complex():
+def test_mixed_currency_complex(config):
     """Test complex scenario with mixed currencies, VAT, and promo"""
     user_cur = "GBP"
     fx = {"EUR": 1.0, "USD": 1.08, "GBP": 0.85}
-    cfg = yaml.safe_load(open("app/config/settings.example.yaml"))
-    vat_fallback = cfg["pricing"]["vat_fallback_rate"]
-    promos = cfg["pricing"]["promo_rules"]
+    vat_fallback = config["pricing"]["vat_fallback_rate"]
+    promos = config["pricing"]["promo_rules"]
     
     offer = {
         "price": {"amount": 50.0, "currency": "EUR", "includes_vat": False},

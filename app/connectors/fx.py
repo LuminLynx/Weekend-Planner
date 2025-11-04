@@ -54,8 +54,8 @@ async def get_fx_rates(base_url: str, ttl_seconds: int = FX_CACHE_TTL_SECONDS) -
             rates["EUR"] = 1.0
             _save_last_good(rates)
             return rates, "live"
-    except Exception:
-        # Fallback to last_good (even if stale)
+    except (httpx.HTTPError, json.JSONDecodeError, KeyError) as e:
+        # Network error or invalid response, fallback to last_good
         if last_good:
             return last_good, "last_good"
         # Ultimate fallback: EUR only

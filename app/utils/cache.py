@@ -39,7 +39,8 @@ class SimpleCache:
             
             if age < ttl_seconds:
                 return data["value"]
-        except Exception:
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            # Corrupted cache file, ignore and return None
             pass
         
         return None

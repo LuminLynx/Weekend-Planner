@@ -72,7 +72,7 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
                 landed_amount=landed["amount"],
                 currency=landed["currency"],
                 fx_source=fx_source,
-                cache_fx=fx_source in ("cached_last_good",),
+                cache_fx=fx_source == "cached_last_good",
                 buy_now=buy_now,
                 reason=buy_reason,
                 score=score,
@@ -100,7 +100,7 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
                 item["debug"] = {
                     "fx_source": fx_source,
                     "cache": {
-                        "fx_hit": fx_source in ("cached_last_good",),
+                        "fx_hit": fx_source == "cached_last_good",
                         "dining_hit": dining_cache_hit
                     },
                     "breakdown": breakdown,
