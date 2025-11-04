@@ -310,12 +310,13 @@
     </div>
 
     <script>
-        // FX rates (sample data - in production this would be fetched from an API)
+        // FX rates (sample data - base currency EUR, approximate rates for demo purposes)
+        // In production, these would be fetched from a live API (e.g., ECB, exchangerate.host)
         const FX_RATES = {
-            "USD": 1.08,
-            "GBP": 0.85,
-            "EUR": 1.0,
-            "JPY": 161.5
+            "USD": 1.08,  // 1 EUR = 1.08 USD
+            "GBP": 0.85,  // 1 EUR = 0.85 GBP
+            "EUR": 1.0,   // Base currency
+            "JPY": 161.5  // 1 EUR = 161.5 JPY
         };
 
         // Promo rules configuration
@@ -603,7 +604,7 @@
             const withDining = diningInput.checked;
             
             if (!date) {
-                alert('Please select a date');
+                resultsDiv.innerHTML = '<div class="error"><strong>⚠️ Missing Date:</strong> Please select an event date to continue.</div>';
                 return;
             }
             
@@ -702,10 +703,9 @@
         window.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
             const nextSaturday = new Date(today);
-            nextSaturday.setDate(today.getDate() + (6 - today.getDay() + 7) % 7);
-            if (nextSaturday <= today) {
-                nextSaturday.setDate(nextSaturday.getDate() + 7);
-            }
+            // Calculate days until next Saturday (0=Sunday, 6=Saturday)
+            const daysUntilSaturday = (6 - today.getDay() + 7) % 7 || 7;
+            nextSaturday.setDate(today.getDate() + daysUntilSaturday);
             document.getElementById('date').value = nextSaturday.toISOString().split('T')[0];
         });
     </script>
