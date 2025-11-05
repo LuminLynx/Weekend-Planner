@@ -10,6 +10,7 @@ from .policies.buy_now import buy_now_policy
 from .ui.copy import templates as tpl
 from .utils.logging import log_itinerary
 from .utils.profile import get_profile_manager
+from .utils.share import get_share_manager, generate_html_view
 
 app = FastAPI(title="Weekend Planner API")
 
@@ -186,6 +187,35 @@ async def plan_debug(date: str = Query(..., description="YYYY-MM-DD"),
                      with_dining: bool = Query(True, description="Include dining suggestions")):
     result = await _generate_itineraries(date, budget, with_dining, debug=True)
     return JSONResponse(result)
+
+@app.post("/share")
+async def create_share(date: str = Query(..., description="YYYY-MM-DD"),
+                      budget: float = Query(30.0, description="Budget per person"),
+                      with_dining: bool = Query(True, description="Include dining suggestions")):
+    """Create a shareable link for a plan"""
+    # Generate the plan
+    result = await _generate_itineraries(date, budget, with_dining, debug=False)
+    
+    # Save and get share ID
+    share_manager = get_share_manager()
+    plan_id = share_manager.save_plan(result)
+    
+    return JSONResponse({
+        "plan_id": plan_id,
+        "share_url": f"/share/{plan_id}"
+    })
+
+@app.get("/share/{plan_id}", response_class=HTMLResponse)
+async def get_shared_plan(plan_id: str):
+    """View a shared plan"""
+    share_manager = get_share_manager()
+    plan_data = share_manager.get_plan(plan_id)
+    
+    if not plan_data:
+        return HTMLResponse("<h1>Plan not found</h1><p>This shared plan does not exist.</p>", status_code=404)
+    
+    html = generate_html_view(plan_data, plan_id)
+    return HTMLResponse(html)
 
 INDEX_HTML = """
 <!doctype html>
