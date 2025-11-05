@@ -148,17 +148,17 @@ def generate_html_view(plan_data: dict, plan_id: str) -> str:
         currency = landed.get("currency", "EUR")
         provider = best_price.get("provider", "")
         
-        weather = item.get("weather", {})
-        weather_desc = weather.get("desc", "N/A") if weather else "N/A"
-        temp_c = weather.get("temp_c", "N/A") if weather else "N/A"
+        weather = item.get("weather") or {}
+        weather_desc = weather.get("desc", "N/A")
+        temp_c = weather.get("temp_c", "N/A")
         
-        travel = item.get("travel", {})
-        distance_km = travel.get("distance_km", "N/A") if travel else "N/A"
-        co2_kg_pp = travel.get("co2_kg_pp", "N/A") if travel else "N/A"
+        travel = item.get("travel") or {}
+        distance_km = travel.get("distance_km", "N/A")
+        co2_kg_pp = travel.get("co2_kg_pp", "N/A")
         
-        meal_bundle = item.get("meal_bundle", {})
-        dining = meal_bundle.get("chosen", {}) if meal_bundle else {}
-        dining_name = dining.get("name", "None") if dining else "None"
+        meal_bundle = item.get("meal_bundle") or {}
+        dining = meal_bundle.get("chosen") or {}
+        dining_name = dining.get("name", "None")
         
         rationale = item.get("rationale", "")
         
