@@ -35,6 +35,11 @@ apis:
     token: \"DINING_TOKEN\"
     timeout_seconds: 5
     cache_ttl_seconds: 900  # 15 minutes
+  weather:
+    provider: \"open-meteo\"
+    base_url: \"https://api.open-meteo.com/v1/forecast\"
+    timeout_seconds: 10
+    cache_ttl_seconds: 7200  # 2 hours
 
 pricing:
   vat_fallback_rate: 0.23
@@ -91,6 +96,12 @@ _PARSED = {
             "token": "DINING_TOKEN",
             "timeout_seconds": 5,
             "cache_ttl_seconds": 900,
+        },
+        "weather": {
+            "provider": "open-meteo",
+            "base_url": "https://api.open-meteo.com/v1/forecast",
+            "timeout_seconds": 10,
+            "cache_ttl_seconds": 7200,
         },
     },
     "pricing": {

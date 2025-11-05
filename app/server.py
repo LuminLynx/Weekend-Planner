@@ -3,7 +3,7 @@ from fastapi import FastAPI, Query, Body
 from fastapi.responses import JSONResponse, HTMLResponse
 import asyncio, yaml, json, httpx
 from datetime import datetime
-from .connectors import ticket_vendor_a, ticket_vendor_b, fx as fx_api, dining as dining_api
+from .connectors import ticket_vendor_a, ticket_vendor_b, fx as fx_api, dining as dining_api, weather as weather_api
 from .normalizers.price import compute_landed
 from .ranking.scorer import budget_aware_score
 from .policies.buy_now import buy_now_policy
@@ -34,6 +34,10 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
         "start_ts": f"{date}T20:30:00Z",
         "venue": {"lat": 38.709, "lng": -9.133, "address": "Lisbon"}
     }
+    
+    # Fetch weather for the event location
+    weather = await weather_api.get_weather(event["venue"]["lat"], event["venue"]["lng"])
+    
     async with httpx.AsyncClient(timeout=10) as session:
         fx_rates, fx_source = await fx_api.get_fx_rates("https://api.exchangerate.host/latest")
         offers = []
@@ -102,6 +106,7 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
                     "price_drop_prob_7d": prob, "buy_now": buy_now, "url": offer.get("url")
                 },
                 "meal_bundle": {"chosen": dining_choice} if dining_choice else None,
+                "weather": weather,
                 "score": score,
                 "rationale": tpl.itinerary_copy(
                     event["title"], event["start_ts"], landed["amount"], landed["currency"],
@@ -128,7 +133,8 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
                         "preferences": user_prefs
                     },
                     "buy_now_reason": buy_reason,
-                    "inventory_hint": offer.get("inventory_hint", "med")
+                    "inventory_hint": offer.get("inventory_hint", "med"),
+                    "weather": weather
                 }
             
             items.append(item)
