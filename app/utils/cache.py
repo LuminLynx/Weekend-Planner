@@ -1,5 +1,6 @@
 
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Optional, Any, Callable
@@ -30,6 +31,7 @@ class SimpleCache:
         """
         cache_file = self._cache_path(key)
         if not cache_file.exists():
+            print(f"[CACHE] MISS: {key}", file=sys.stderr)
             return None
         
         try:
@@ -38,9 +40,13 @@ class SimpleCache:
             age = (datetime.now(timezone.utc) - cached_time).total_seconds()
             
             if age < ttl_seconds:
+                print(f"[CACHE] HIT: {key} (age={age:.1f}s, ttl={ttl_seconds}s)", file=sys.stderr)
                 return data["value"]
+            else:
+                print(f"[CACHE] EXPIRED: {key} (age={age:.1f}s, ttl={ttl_seconds}s)", file=sys.stderr)
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             # Corrupted cache file, ignore and return None
+            print(f"[CACHE] CORRUPTED: {key}", file=sys.stderr)
             pass
         
         return None
@@ -59,6 +65,7 @@ class SimpleCache:
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         cache_file.write_text(json.dumps(data))
+        print(f"[CACHE] SET: {key}", file=sys.stderr)
     
     def clear(self, key: Optional[str] = None) -> None:
         """

@@ -10,6 +10,9 @@ def budget_aware_score(base_score: float, landed_cost: float, user_budget_pp: fl
     - Bookability bonus: prefer items that are immediately bookable
     - Price drop bonus: reward likely price drops for far-out events
     - Total cost penalty: small penalty for absolute cost
+    
+    Returns:
+        Score rounded to 3 decimal places
     """
     total_cost = landed_cost + (dining_est_pp or 0.0)
     
@@ -30,5 +33,6 @@ def budget_aware_score(base_score: float, landed_cost: float, user_budget_pp: fl
     # Small penalty for absolute cost
     cost_penalty = total_cost / 1000.0
     
-    return float(base_score - budget_penalty + bookable_bonus - cost_penalty + drop_bonus)
+    score = base_score - budget_penalty + bookable_bonus - cost_penalty + drop_bonus
+    return round(score, 3)
 
