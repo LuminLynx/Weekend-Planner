@@ -2,6 +2,7 @@
 import httpx
 import json
 import os
+import sys
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
@@ -63,7 +64,7 @@ async def get_fx_rates(base_url: str, ttl_seconds: int = FX_CACHE_TTL_SECONDS) -
     except (httpx.HTTPError, json.JSONDecodeError, KeyError) as e:
         # Network error or invalid response, fallback to last_good
         if last_good:
-            print(f"[FX] Network error, using last_good fallback: {type(e).__name__}", file=__import__('sys').stderr)
+            print(f"[FX] Network error, using last_good fallback: {type(e).__name__}", file=sys.stderr)
             return last_good, "last_good"
         # Ultimate fallback: EUR only
         return {"EUR": 1.0}, "fallback_eur_only"

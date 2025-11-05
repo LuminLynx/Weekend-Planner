@@ -2,6 +2,7 @@
 # Stub connector; replace with real API mapping later.
 import httpx
 import asyncio
+import sys
 import yaml
 from pathlib import Path
 from ..utils.cache import get_cache
@@ -49,7 +50,7 @@ def _record_failure():
     if _circuit_breaker["failures"] >= MAX_FAILURES:
         _circuit_breaker["state"] = "open"
         print(f"[VENDOR_A] Circuit breaker OPEN after {_circuit_breaker['failures']} failures", 
-              file=__import__('sys').stderr)
+              file=sys.stderr)
 
 async def get_offers(session, event_query: dict) -> list[dict]:
     """
@@ -72,7 +73,7 @@ async def get_offers(session, event_query: dict) -> list[dict]:
     # Check circuit breaker
     if not _should_allow_request():
         print("[VENDOR_A] Circuit breaker OPEN, using cached/fallback data", 
-              file=__import__('sys').stderr)
+              file=sys.stderr)
         # Return cached data even if expired, or empty list
         stale_cached = cache.get(cache_key, CACHE_TTL_SECONDS * 10)
         return stale_cached if stale_cached else []
@@ -137,7 +138,7 @@ async def get_offers(session, event_query: dict) -> list[dict]:
         return results
     except Exception as e:
         _record_failure()
-        print(f"[VENDOR_A] Error: {e}", file=__import__('sys').stderr)
+        print(f"[VENDOR_A] Error: {e}", file=sys.stderr)
         # Return stale cache or empty
         stale_cached = cache.get(cache_key, CACHE_TTL_SECONDS * 10)
         return stale_cached if stale_cached else []
