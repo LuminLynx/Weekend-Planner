@@ -1,7 +1,8 @@
 
 def budget_aware_score(base_score: float, landed_cost: float, user_budget_pp: float,
                        price_drop_prob_7d: float, days_to_event: int, dining_est_pp: float=0.0,
-                       is_bookable: bool=True) -> float:
+                       is_bookable: bool=True, user_preferences: dict=None, 
+                       event_city: str=None, dining_cuisines: list=None) -> float:
     """
     Calculate score preferring within-budget and bookable options.
     
@@ -10,6 +11,12 @@ def budget_aware_score(base_score: float, landed_cost: float, user_budget_pp: fl
     - Bookability bonus: prefer items that are immediately bookable
     - Price drop bonus: reward likely price drops for far-out events
     - Total cost penalty: small penalty for absolute cost
+    - Personalization bonus: small bonuses for matching user preferences
+    
+    Args:
+        user_preferences: Optional dict with home_city, preferred_cuisines
+        event_city: City where event takes place
+        dining_cuisines: List of cuisine types for dining option
     
     Returns:
         Score rounded to 3 decimal places
@@ -33,6 +40,21 @@ def budget_aware_score(base_score: float, landed_cost: float, user_budget_pp: fl
     # Small penalty for absolute cost
     cost_penalty = total_cost / 1000.0
     
-    score = base_score - budget_penalty + bookable_bonus - cost_penalty + drop_bonus
+    # Personalization bonuses
+    personalization_bonus = 0.0
+    if user_preferences:
+        # Bonus if event is near home city
+        if event_city and user_preferences.get("home_city"):
+            if event_city.lower() == user_preferences["home_city"].lower():
+                personalization_bonus += 0.05
+        
+        # Bonus if dining matches preferred cuisines
+        if dining_cuisines and user_preferences.get("preferred_cuisines"):
+            preferred = [c.lower() for c in user_preferences["preferred_cuisines"]]
+            cuisines = [c.lower() for c in dining_cuisines]
+            if any(c in preferred for c in cuisines):
+                personalization_bonus += 0.05
+    
+    score = base_score - budget_penalty + bookable_bonus - cost_penalty + drop_bonus + personalization_bonus
     return round(score, 3)
 

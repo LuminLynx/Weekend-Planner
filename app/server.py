@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Body
 from fastapi.responses import JSONResponse, HTMLResponse
 import asyncio, yaml, json, httpx
 from datetime import datetime
@@ -9,6 +9,7 @@ from .ranking.scorer import budget_aware_score
 from .policies.buy_now import buy_now_policy
 from .ui.copy import templates as tpl
 from .utils.logging import log_itinerary
+from .utils.profile import get_profile_manager
 
 app = FastAPI(title="Weekend Planner API")
 
@@ -23,6 +24,11 @@ def _days_to_event(start_ts: str) -> int:
 
 async def _generate_itineraries(date: str, budget: float, with_dining: bool, debug: bool = False):
     """Generate itineraries with optional debug info"""
+    # Load user preferences
+    profile_manager = get_profile_manager()
+    user_profile = profile_manager.load()
+    user_prefs = user_profile.to_dict()
+    
     event = {
         "title": "Indie Concert",
         "start_ts": f"{date}T20:30:00Z",
@@ -54,16 +60,24 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
             )
             dining_choice = None
             dining_cache_hit = False
+            dining_cuisines = []
             if with_dining:
                 near, dining_cache_hit = await dining_api.get_nearby(event["venue"])
                 dining_choice = near[0] if near else None
+                # Extract cuisines if available
+                if dining_choice and "cuisines" in dining_choice:
+                    dining_cuisines = dining_choice["cuisines"]
+            
             score = budget_aware_score(
                 base_score=0.7,
                 landed_cost=landed["amount"],
                 user_budget_pp=budget,
                 price_drop_prob_7d=prob,
                 days_to_event=days_to_event,
-                dining_est_pp=(dining_choice or {}).get("est_pp", 0.0)
+                dining_est_pp=(dining_choice or {}).get("est_pp", 0.0),
+                user_preferences=user_prefs,
+                event_city=event["venue"].get("address"),
+                dining_cuisines=dining_cuisines
             )
             
             # Structured logging for observability
@@ -104,13 +118,14 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
                         "dining_hit": dining_cache_hit
                     },
                     "breakdown": breakdown,
-                    "scoring": {
+                    "scoring_inputs": {
                         "base_score": 0.7,
                         "landed_cost": landed["amount"],
                         "user_budget": budget,
                         "price_drop_prob": prob,
                         "days_to_event": days_to_event,
-                        "dining_est": (dining_choice or {}).get("est_pp", 0.0)
+                        "dining_est": (dining_choice or {}).get("est_pp", 0.0),
+                        "preferences": user_prefs
                     },
                     "buy_now_reason": buy_reason,
                     "inventory_hint": offer.get("inventory_hint", "med")
@@ -124,6 +139,20 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
 @app.get("/healthz")
 async def health():
     return {"ok": True}
+
+@app.get("/user/preferences")
+async def get_user_preferences():
+    """Get current user preferences"""
+    profile_manager = get_profile_manager()
+    profile = profile_manager.load()
+    return JSONResponse(profile.to_dict())
+
+@app.post("/user/preferences")
+async def update_user_preferences(preferences: dict = Body(...)):
+    """Update user preferences"""
+    profile_manager = get_profile_manager()
+    profile = profile_manager.update(**preferences)
+    return JSONResponse(profile.to_dict())
 
 @app.get("/plan")
 async def plan(date: str = Query(..., description="YYYY-MM-DD"),

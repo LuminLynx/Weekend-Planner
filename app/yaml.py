@@ -4,6 +4,13 @@ _RAW = """timezone: \"Europe/Lisbon\"
 currency: \"EUR\"
 budget_per_person: 30
 
+# User profile defaults
+user_profile:
+  home_city: \"Berlin\"
+  preferred_currency: \"EUR\"
+  max_distance_km: 2000
+  preferred_cuisines: []
+
 apis:
   vendors:
     vendor_a:
@@ -50,6 +57,12 @@ _PARSED = {
     "timezone": "Europe/Lisbon",
     "currency": "EUR",
     "budget_per_person": 30,
+    "user_profile": {
+        "home_city": "Berlin",
+        "preferred_currency": "EUR",
+        "max_distance_km": 2000,
+        "preferred_cuisines": []
+    },
     "apis": {
         "vendors": {
             "vendor_a": {
