@@ -149,7 +149,6 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
                     "weather": weather,
                     "travel": travel_info
                 }
-                }
             
             items.append(item)
 
