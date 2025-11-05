@@ -3,6 +3,7 @@
 import httpx
 import asyncio
 import sys
+import time
 import yaml
 from pathlib import Path
 from ..utils.cache import get_cache
@@ -20,7 +21,6 @@ CIRCUIT_OPEN_DURATION = 60  # seconds
 
 def _should_allow_request() -> bool:
     """Check if circuit breaker allows request"""
-    import time
     state = _circuit_breaker["state"]
     
     if state == "closed":
@@ -43,7 +43,6 @@ def _record_success():
 
 def _record_failure():
     """Record failed request"""
-    import time
     _circuit_breaker["failures"] += 1
     _circuit_breaker["last_failure_time"] = time.time()
     
