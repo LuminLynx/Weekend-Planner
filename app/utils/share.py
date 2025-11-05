@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 from datetime import datetime, timezone
+from html import escape
 
 
 class ShareManager:
@@ -133,34 +134,38 @@ def generate_html_view(plan_data: dict, plan_id: str) -> str:
         HTML string
     """
     itineraries = plan_data.get("data", {}).get("itineraries", [])
-    created_at = plan_data.get("created_at", "")
+    
+    # Escape metadata to prevent XSS
+    created_at = escape(str(plan_data.get("created_at", "")))
+    plan_id_escaped = escape(str(plan_id))
     
     # Build itinerary HTML
     itinerary_html = ""
     for idx, item in enumerate(itineraries, 1):
-        event_title = item.get("event_title", "Event")
-        start_ts = item.get("start_ts", "")
+        # Escape all user-provided data to prevent XSS
+        event_title = escape(str(item.get("event_title", "Event")))
+        start_ts = escape(str(item.get("start_ts", "")))
         score = item.get("score", 0)
         
         best_price = item.get("best_price", {})
         landed = best_price.get("landed", {})
         amount = landed.get("amount", 0)
-        currency = landed.get("currency", "EUR")
-        provider = best_price.get("provider", "")
+        currency = escape(str(landed.get("currency", "EUR")))
+        provider = escape(str(best_price.get("provider", "")))
         
         weather = item.get("weather") or {}
-        weather_desc = weather.get("desc", "N/A")
-        temp_c = weather.get("temp_c", "N/A")
+        weather_desc = escape(str(weather.get("desc", "N/A")))
+        temp_c = str(weather.get("temp_c", "N/A"))
         
         travel = item.get("travel") or {}
-        distance_km = travel.get("distance_km", "N/A")
-        co2_kg_pp = travel.get("co2_kg_pp", "N/A")
+        distance_km = str(travel.get("distance_km", "N/A"))
+        co2_kg_pp = str(travel.get("co2_kg_pp", "N/A"))
         
         meal_bundle = item.get("meal_bundle") or {}
         dining = meal_bundle.get("chosen") or {}
-        dining_name = dining.get("name", "None")
+        dining_name = escape(str(dining.get("name", "None")))
         
-        rationale = item.get("rationale", "")
+        rationale = escape(str(item.get("rationale", "")))
         
         itinerary_html += f"""
         <div class="card">
@@ -181,7 +186,7 @@ def generate_html_view(plan_data: dict, plan_id: str) -> str:
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Shared Weekend Plan - {plan_id}</title>
+    <title>Shared Weekend Plan - {plan_id_escaped}</title>
     <style>
         body {{
             font-family: system-ui, -apple-system, sans-serif;
@@ -232,7 +237,7 @@ def generate_html_view(plan_data: dict, plan_id: str) -> str:
 <body>
     <h1>🗓️ Weekend Planner - Shared Itinerary</h1>
     <div class="meta">
-        <p><strong>Plan ID:</strong> {plan_id}</p>
+        <p><strong>Plan ID:</strong> {plan_id_escaped}</p>
         <p><strong>Created:</strong> {created_at}</p>
     </div>
     
