@@ -3,7 +3,7 @@ from fastapi import FastAPI, Query, Body
 from fastapi.responses import JSONResponse, HTMLResponse
 import asyncio, yaml, json, httpx
 from datetime import datetime
-from .connectors import ticket_vendor_a, ticket_vendor_b, fx as fx_api, dining as dining_api, weather as weather_api
+from .connectors import ticket_vendor_a, ticket_vendor_b, fx as fx_api, dining as dining_api, weather as weather_api, travel as travel_api
 from .normalizers.price import compute_landed
 from .ranking.scorer import budget_aware_score
 from .policies.buy_now import buy_now_policy
@@ -37,6 +37,12 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
     
     # Fetch weather for the event location
     weather = await weather_api.get_weather(event["venue"]["lat"], event["venue"]["lng"])
+    
+    # Calculate travel info from home city to event city
+    travel_info = travel_api.get_travel_info(
+        user_prefs.get("home_city", "Berlin"),
+        event["venue"].get("address", "Lisbon")
+    )
     
     async with httpx.AsyncClient(timeout=10) as session:
         fx_rates, fx_source = await fx_api.get_fx_rates("https://api.exchangerate.host/latest")
@@ -81,7 +87,9 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
                 dining_est_pp=(dining_choice or {}).get("est_pp", 0.0),
                 user_preferences=user_prefs,
                 event_city=event["venue"].get("address"),
-                dining_cuisines=dining_cuisines
+                dining_cuisines=dining_cuisines,
+                distance_km=travel_info.get("distance_km") if travel_info else None,
+                co2_kg_pp=travel_info.get("co2_kg_pp") if travel_info else None
             )
             
             # Structured logging for observability
@@ -107,6 +115,7 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
                 },
                 "meal_bundle": {"chosen": dining_choice} if dining_choice else None,
                 "weather": weather,
+                "travel": travel_info,
                 "score": score,
                 "rationale": tpl.itinerary_copy(
                     event["title"], event["start_ts"], landed["amount"], landed["currency"],
@@ -130,11 +139,15 @@ async def _generate_itineraries(date: str, budget: float, with_dining: bool, deb
                         "price_drop_prob": prob,
                         "days_to_event": days_to_event,
                         "dining_est": (dining_choice or {}).get("est_pp", 0.0),
-                        "preferences": user_prefs
+                        "preferences": user_prefs,
+                        "distance_km": travel_info.get("distance_km") if travel_info else None,
+                        "co2_kg_pp": travel_info.get("co2_kg_pp") if travel_info else None
                     },
                     "buy_now_reason": buy_reason,
                     "inventory_hint": offer.get("inventory_hint", "med"),
-                    "weather": weather
+                    "weather": weather,
+                    "travel": travel_info
+                }
                 }
             
             items.append(item)
