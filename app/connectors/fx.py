@@ -23,6 +23,9 @@ def _load_last_good() -> tuple[dict[str, float] | None, str]:
 
 def _save_last_good(rates: dict[str, float]) -> None:
     """Save FX rates to disk with timestamp"""
+    # Ensure data directory exists
+    FX_LAST_GOOD_PATH.parent.mkdir(parents=True, exist_ok=True)
+    
     data = {
         "rates": rates,
         "timestamp": datetime.now(timezone.utc).isoformat()
