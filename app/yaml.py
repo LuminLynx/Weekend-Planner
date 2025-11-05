@@ -4,6 +4,13 @@ _RAW = """timezone: \"Europe/Lisbon\"
 currency: \"EUR\"
 budget_per_person: 30
 
+# User profile defaults
+user_profile:
+  home_city: \"Berlin\"
+  preferred_currency: \"EUR\"
+  max_distance_km: 2000
+  preferred_cuisines: []
+
 apis:
   vendors:
     vendor_a:
@@ -28,6 +35,11 @@ apis:
     token: \"DINING_TOKEN\"
     timeout_seconds: 5
     cache_ttl_seconds: 900  # 15 minutes
+  weather:
+    provider: \"open-meteo\"
+    base_url: \"https://api.open-meteo.com/v1/forecast\"
+    timeout_seconds: 10
+    cache_ttl_seconds: 7200  # 2 hours
 
 pricing:
   vat_fallback_rate: 0.23
@@ -50,6 +62,12 @@ _PARSED = {
     "timezone": "Europe/Lisbon",
     "currency": "EUR",
     "budget_per_person": 30,
+    "user_profile": {
+        "home_city": "Berlin",
+        "preferred_currency": "EUR",
+        "max_distance_km": 2000,
+        "preferred_cuisines": []
+    },
     "apis": {
         "vendors": {
             "vendor_a": {
@@ -78,6 +96,12 @@ _PARSED = {
             "token": "DINING_TOKEN",
             "timeout_seconds": 5,
             "cache_ttl_seconds": 900,
+        },
+        "weather": {
+            "provider": "open-meteo",
+            "base_url": "https://api.open-meteo.com/v1/forecast",
+            "timeout_seconds": 10,
+            "cache_ttl_seconds": 7200,
         },
     },
     "pricing": {
