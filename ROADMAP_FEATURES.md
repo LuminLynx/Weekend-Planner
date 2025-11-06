@@ -384,7 +384,25 @@ pytest -v
 
 ### Manual Testing
 
-See `/tmp/test_roadmap_features.py` for a comprehensive manual test that verifies:
+Run a comprehensive integration test to verify all features:
+
+```bash
+# Test user preferences
+curl http://localhost:8000/user/preferences
+curl -X POST http://localhost:8000/user/preferences \
+  -H "Content-Type: application/json" \
+  -d '{"home_city": "Paris", "preferred_cuisines": ["French"]}'
+
+# Test planning with all features
+curl "http://localhost:8000/plan/debug?date=2025-11-20&budget=30&with_dining=true" \
+  | jq '.itineraries[0] | {weather, travel, score}'
+
+# Test sharing
+curl -X POST "http://localhost:8000/share?date=2025-11-20&budget=30" \
+  | jq '.share_url'
+```
+
+This verifies:
 - Profile management
 - Weather fetching
 - Distance/CO₂ calculation
