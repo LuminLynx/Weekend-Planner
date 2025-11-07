@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekend Planner - Live App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.2em;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+        
+        header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .form-section {
+            background: #f8f9fa;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            margin-bottom: 16px;
+        }
+        
+        .form-group {
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.95em;
+        }
+        
+        input[type="date"],
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="date"]:focus,
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-top: 24px;
+        }
+        
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 16px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .results {
+            margin-top: 30px;
+        }
+        
+        .card {
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            background: white;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+        
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 12px;
+            font-size: 1.4em;
+        }
+        
+        .card-details {
+            color: #555;
+            margin-bottom: 12px;
+            line-height: 1.8;
+        }
+        
+        .price-info {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 12px 0;
+        }
+        
+        .price-main {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+        
+        .price-breakdown {
+            font-size: 0.9em;
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 4px 4px 4px 0;
+        }
+        
+        .badge-buy {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .badge-wait {
+            background: #ed8936;
+            color: white;
+        }
+        
+        .badge-provider {
+            background: #667eea;
+            color: white;
+        }
+        
+        .meal-info {
+            background: #fff5e6;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+            border-left: 4px solid #f6ad55;
+        }
+        
+        .muted {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 8px;
+        }
+        
+        .info-box {
+            background: #e6f7ff;
+            border-left: 4px solid #1890ff;
+            padding: 16px;
+            margin-bottom: 24px;
+            border-radius: 4px;
+        }
+        
+        .info-box h4 {
+            color: #1890ff;
+            margin-bottom: 8px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+        
+        .error {
+            background: #fff5f5;
+            border-left: 4px solid #fc8181;
+            padding: 16px;
+            border-radius: 4px;
+            color: #742a2a;
+        }
+        
+        @media (max-width: 600px) {
+            .form-row {
+                flex-direction: column;
+            }
+            
+            .form-group {
+                width: 100%;
+            }
+            
+            header h1 {
+                font-size: 1.8em;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎉 Weekend Planner</h1>
+            <p>Budget-First Trip Planning Made Easy</p>
+        </header>
+        
+        <div class="content">
+            <div class="info-box">
+                <h4>ℹ️ Live Demo Mode</h4>
+                <p>This is a standalone version running entirely in your browser. No backend setup required! 
+                   The app uses sample ticket data to demonstrate the planning logic, pricing calculations, 
+                   and recommendation engine.</p>
+            </div>
+            
+            <div class="form-section">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="date">Event Date</label>
+                        <input type="date" id="date" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="budget">Budget per Person (€)</label>
+                        <input type="number" id="budget" value="30" min="1" step="1" required>
+                    </div>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="dining" checked>
+                    <label for="dining" style="margin-bottom: 0;">Include dining recommendations</label>
+                </div>
+                
+                <button onclick="generatePlan()" id="planBtn">🔍 Find Weekend Plans</button>
+            </div>
+            
+            <div id="results" class="results"></div>
+        </div>
+    </div>
+
+    <script>
+        // FX rates (sample data - base currency EUR, approximate rates for demo purposes)
+        // In production, these would be fetched from a live API (e.g., ECB, exchangerate.host)
+        const FX_RATES = {
+            "USD": 1.08,  // 1 EUR = 1.08 USD
+            "GBP": 0.85,  // 1 EUR = 0.85 GBP
+            "EUR": 1.0,   // Base currency
+            "JPY": 161.5  // 1 EUR = 161.5 JPY
+        };
+
+        // Promo rules configuration
+        const PROMO_RULES = {
+            "STUDENT10": {
+                "type": "percent",
+                "value": 10,
+                "applies_to": "base",
+                "discount_multiplier": 1.0
+            },
+            "LOYALTY5": {
+                "type": "percent",
+                "value": 5,
+                "applies_to": "total",
+                "discount_multiplier": 1.0
+            },
+            "EARLY20": {
+                "type": "percent",
+                "value": 20,
+                "applies_to": "base_plus_fees",
+                "discount_multiplier": 1.0
+            }
+        };
+
+        // Sample dining options
+        const DINING_OPTIONS = [
+            {
+                name: "Trattoria Bella Vista",
+                est_pp: 18.0,
+                distance_m: 320,
+                booking_url: "https://example.com/dining/1"
+            },
+            {
+                name: "Cafe Riverside",
+                est_pp: 12.0,
+                distance_m: 180,
+                booking_url: "https://example.com/dining/2"
+            }
+        ];
+
+        // Helper functions
+        function round2(x) {
+            return Math.round(x * 100) / 100;
+        }
+
+        function convertFx(amount, fromCur, toCur, fxRates) {
+            if (fromCur === toCur) return amount;
+            // Convert via EUR as pivot
+            if (fromCur !== "EUR") {
+                amount = amount / fxRates[fromCur];
+            }
+            if (toCur !== "EUR") {
+                amount = amount * fxRates[toCur];
+            }
+            return amount;
+        }
+
+        function targetAmount(rule, base, fees, tax) {
+            const applies = rule.applies_to || "total";
+            if (applies === "base") return base;
+            if (applies === "base_plus_fees") return base + fees;
+            return base + fees + tax;
+        }
+
+        function bestPromo(totalBeforePromo, availableCodes, promoRules, base, fees, tax) {
+            let best = 0.0;
+            for (const code of (availableCodes || [])) {
+                const rule = promoRules[code];
+                if (!rule) continue;
+                const target = targetAmount(rule, base, fees, tax);
+                let disc;
+                if (rule.type === "percent") {
+                    const pct = (rule.discount_multiplier || 1.0) * (rule.value / 100.0);
+                    disc = target * pct;
+                } else {
+                    disc = parseFloat(rule.value);
+                }
+                if (disc > best) best = disc;
+            }
+            return Math.min(best, totalBeforePromo);
+        }
+
+        function computeLanded(offer, userCurrency, fxRates, vatFallbackRate, promoRules) {
+            const cur = offer.price.currency;
+            const base = parseFloat(offer.price.amount);
+            
+            // Handle mixed-currency fees
+            let feesInBaseCurrency = 0.0;
+            for (const fee of (offer.fees || [])) {
+                let feeAmount = parseFloat(fee.amount);
+                const feeCurrency = fee.currency || cur;
+                if (feeCurrency !== cur) {
+                    feeAmount = convertFx(feeAmount, feeCurrency, cur, fxRates);
+                }
+                feesInBaseCurrency += feeAmount;
+            }
+            
+            const includesVat = offer.price.includes_vat || false;
+            const vatRate = offer.vat_rate !== null && offer.vat_rate !== undefined ? 
+                           offer.vat_rate : vatFallbackRate;
+            
+            const tax = includesVat ? 0.0 : base * vatRate;
+            const totalBeforePromo = base + feesInBaseCurrency + tax;
+            const promo = bestPromo(totalBeforePromo, offer.promos, promoRules, 
+                                   base, feesInBaseCurrency, tax);
+            
+            const totalVendorCurrency = Math.max(0.0, totalBeforePromo - promo);
+            const totalUserCur = convertFx(totalVendorCurrency, cur, userCurrency, fxRates);
+            const fxAdj = cur !== userCurrency ? totalUserCur - totalVendorCurrency : 0.0;
+            
+            return {
+                landed: { amount: round2(totalUserCur), currency: userCurrency },
+                breakdown: {
+                    base: round2(base),
+                    fees: round2(feesInBaseCurrency),
+                    vat: round2(tax),
+                    promo: round2(promo),
+                    fx: round2(fxAdj)
+                }
+            };
+        }
+
+        function daysToEvent(dateStr) {
+            const eventDate = new Date(dateStr);
+            const now = new Date();
+            const diffTime = eventDate - now;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return Math.max(0, diffDays);
+        }
+
+        function buyNowPolicy(prob, daysToEvent, threshold, minDaysForce, inventoryHint) {
+            if (daysToEvent <= minDaysForce) {
+                return { decision: true, reason: "event_soon" };
+            }
+            if (inventoryHint === "low") {
+                return { decision: true, reason: "low_inventory" };
+            }
+            if (prob < threshold) {
+                return { decision: true, reason: "low_price_drop_prob" };
+            }
+            return { decision: false, reason: "wait_for_drop" };
+        }
+
+        function budgetAwareScore(baseScore, landedCost, userBudget, priceDropProb, 
+                                 daysToEvent, diningEst) {
+            let score = baseScore;
+            const totalCost = landedCost + diningEst;
+            
+            // Budget penalty/bonus
+            if (totalCost > userBudget) {
+                const budgetGap = totalCost - userBudget;
+                score -= budgetGap / 25.0;
+            } else {
+                const underBudget = userBudget - totalCost;
+                score += Math.min(0.2, underBudget / 50.0);
+            }
+            
+            // Bookability bonus
+            score += 0.1;
+            
+            // Price drop bonus
+            if (priceDropProb > 0.3 && daysToEvent > 7) {
+                score += 0.15;
+            }
+            
+            return round2(score);
+        }
+
+        function generateItinerary(eventTitle, startTs, offer, userBudget, withDining) {
+            const VAT_FALLBACK = 0.23;
+            const userCurrency = "EUR";
+            
+            const { landed, breakdown } = computeLanded(
+                offer, userCurrency, FX_RATES, VAT_FALLBACK, PROMO_RULES
+            );
+            
+            const prob = offer.provider === "a" ? 0.18 : 0.46;
+            const days = daysToEvent(startTs);
+            const { decision: buyNow, reason: buyReason } = buyNowPolicy(
+                prob, days, 0.25, 3, offer.inventory_hint
+            );
+            
+            let diningChoice = null;
+            if (withDining && DINING_OPTIONS.length > 0) {
+                diningChoice = DINING_OPTIONS[0];
+            }
+            
+            const score = budgetAwareScore(
+                0.7, landed.amount, userBudget, prob, days,
+                diningChoice ? diningChoice.est_pp : 0.0
+            );
+            
+            return {
+                event_title: eventTitle,
+                start_ts: startTs,
+                best_price: {
+                    landed: landed,
+                    breakdown: breakdown,
+                    provider: offer.provider,
+                    price_drop_prob_7d: prob,
+                    buy_now: buyNow,
+                    buy_reason: buyReason,
+                    url: offer.url
+                },
+                meal_bundle: diningChoice ? { chosen: diningChoice } : null,
+                score: score,
+                days_to_event: days
+            };
+        }
+
+        function getOffers(eventQuery) {
+            return [
+                {
+                    provider: "a",
+                    title: eventQuery.title,
+                    start_ts: eventQuery.start_ts,
+                    price: { amount: 22.0, currency: "EUR", includes_vat: true },
+                    fees: [{ type: "service", amount: 2.5, currency: "EUR" }],
+                    vat_rate: 0.23,
+                    promos: ["STUDENT10"],
+                    inventory_hint: "med",
+                    url: "https://vendor-a.example/tickets/abc"
+                },
+                {
+                    provider: "b",
+                    title: eventQuery.title,
+                    start_ts: eventQuery.start_ts,
+                    price: { amount: 19.0, currency: "USD", includes_vat: false },
+                    fees: [{ type: "service", amount: 3.1, currency: "USD" }],
+                    vat_rate: null,
+                    promos: ["LOYALTY5"],
+                    inventory_hint: "low",
+                    url: "https://vendor-b.example/offer/xyz"
+                }
+            ];
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function generateRationale(item) {
+            const { best_price, meal_bundle, event_title, days_to_event } = item;
+            const { landed, buy_now, buy_reason, provider } = best_price;
+            
+            let text = `${event_title} happening in ${days_to_event} days. `;
+            text += `Best offer from Provider ${provider.toUpperCase()} at ${landed.amount} ${landed.currency}. `;
+            
+            if (buy_now) {
+                if (buy_reason === "event_soon") {
+                    text += "🔥 Book now - event is approaching soon!";
+                } else if (buy_reason === "low_inventory") {
+                    text += "🔥 Book now - limited tickets available!";
+                } else {
+                    text += "✅ Good price - recommended to book now.";
+                }
+            } else {
+                text += "⏳ Consider waiting - prices may drop.";
+            }
+            
+            if (meal_bundle && meal_bundle.chosen) {
+                text += ` Suggested dining: ${meal_bundle.chosen.name} (€${meal_bundle.chosen.est_pp}/person).`;
+            }
+            
+            return text;
+        }
+
+        async function generatePlan() {
+            const dateInput = document.getElementById('date');
+            const budgetInput = document.getElementById('budget');
+            const diningInput = document.getElementById('dining');
+            const resultsDiv = document.getElementById('results');
+            const planBtn = document.getElementById('planBtn');
+            
+            const date = dateInput.value;
+            const budget = parseFloat(budgetInput.value) || 30;
+            const withDining = diningInput.checked;
+            
+            if (!date) {
+                resultsDiv.innerHTML = '<div class="error"><strong>⚠️ Missing Date:</strong> Please select an event date to continue.</div>';
+                return;
+            }
+            
+            // Show loading
+            planBtn.disabled = true;
+            resultsDiv.innerHTML = '<div class="loading">🔄 Generating your perfect weekend plans...</div>';
+            
+            // Simulate async operation
+            await new Promise(resolve => setTimeout(resolve, 800));
+            
+            try {
+                const eventQuery = {
+                    title: "Indie Concert",
+                    start_ts: `${date}T20:30:00Z`,
+                    venue: { lat: 38.709, lng: -9.133, address: "Lisbon" }
+                };
+                
+                const offers = getOffers(eventQuery);
+                const itineraries = offers.map(offer => 
+                    generateItinerary(eventQuery.title, eventQuery.start_ts, offer, budget, withDining)
+                );
+                
+                // Sort by score
+                itineraries.sort((a, b) => b.score - a.score);
+                
+                // Display results
+                let html = '<h2 style="margin-bottom: 20px; color: #333;">🎯 Your Top Weekend Plans</h2>';
+                
+                itineraries.forEach((item, index) => {
+                    const { best_price, meal_bundle } = item;
+                    const totalCost = meal_bundle ? 
+                        best_price.landed.amount + meal_bundle.chosen.est_pp : 
+                        best_price.landed.amount;
+                    
+                    html += `
+                        <div class="card">
+                            <h3>Option ${index + 1}: ${item.event_title}</h3>
+                            <div class="card-details">
+                                <strong>📅 When:</strong> ${formatDate(item.start_ts)}<br>
+                                <strong>⏱️ Days until event:</strong> ${item.days_to_event} days
+                            </div>
+                            
+                            <div class="price-info">
+                                <div class="price-main">
+                                    €${totalCost.toFixed(2)} ${meal_bundle ? 'total' : 'ticket only'}
+                                </div>
+                                <div class="price-breakdown">
+                                    <strong>Breakdown:</strong><br>
+                                    Base: €${best_price.breakdown.base} | 
+                                    Fees: €${best_price.breakdown.fees} | 
+                                    VAT: €${best_price.breakdown.vat}<br>
+                                    ${best_price.breakdown.promo > 0 ? `Promo: -€${best_price.breakdown.promo} | ` : ''}
+                                    ${best_price.breakdown.fx !== 0 ? `FX Adjustment: €${best_price.breakdown.fx.toFixed(2)}` : ''}
+                                </div>
+                            </div>
+                            
+                            ${meal_bundle ? `
+                                <div class="meal-info">
+                                    <strong>🍽️ Dining Bundle:</strong> ${meal_bundle.chosen.name}<br>
+                                    <small>€${meal_bundle.chosen.est_pp}/person · ${meal_bundle.chosen.distance_m}m away</small>
+                                </div>
+                            ` : ''}
+                            
+                            <div style="margin-top: 12px;">
+                                <span class="badge badge-provider">Provider ${best_price.provider.toUpperCase()}</span>
+                                <span class="badge ${best_price.buy_now ? 'badge-buy' : 'badge-wait'}">
+                                    ${best_price.buy_now ? '✓ Book Now' : '⏳ Wait'}
+                                </span>
+                                ${totalCost <= budget ? 
+                                    '<span class="badge" style="background: #48bb78; color: white;">Within Budget</span>' : 
+                                    '<span class="badge" style="background: #f56565; color: white;">Over Budget</span>'
+                                }
+                            </div>
+                            
+                            <div class="muted" style="margin-top: 12px;">
+                                ${generateRationale(item)}<br>
+                                <small>Score: ${item.score} · Price drop probability: ${(best_price.price_drop_prob_7d * 100).toFixed(0)}%</small>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                resultsDiv.innerHTML = html;
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="error">
+                        <strong>⚠️ Error:</strong> Failed to generate plans. ${error.message}
+                    </div>
+                `;
+            } finally {
+                planBtn.disabled = false;
+            }
+        }
+
+        // Set default date to next Saturday
+        window.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            const nextSaturday = new Date(today);
+            // Calculate days until next Saturday (0=Sunday, 6=Saturday)
+            const daysUntilSaturday = (6 - today.getDay() + 7) % 7 || 7;
+            nextSaturday.setDate(today.getDate() + daysUntilSaturday);
+            document.getElementById('date').value = nextSaturday.toISOString().split('T')[0];
+        });
+    </script>
+</body>
+</html>
