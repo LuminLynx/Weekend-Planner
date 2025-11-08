@@ -111,7 +111,6 @@ _PARSED = {
                 "type": "percent",
                 "value": 10,
                 "applies_to": "base_plus_fees",
-                # Discount multiplier for student promo (legacy value from main branch)
                 "discount_multiplier": 0.6326530612244898,
             },
             "LOYALTY5": {
