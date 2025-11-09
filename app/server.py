@@ -20,10 +20,10 @@ def healthz() -> dict[str, str]:
 
 
 @app.get("/plan")
-def plan(date: str = Query(...), budget: float = Query(...), with_dining: bool = Query(False)) -> dict:
+async def plan(date: str = Query(...), budget: float = Query(...), with_dining: bool = Query(False)) -> dict:
     if budget <= 0:
         raise HTTPException(status_code=400, detail="budget must be positive")
-    result = planner.plan(date=date, budget_pp=budget, with_dining=with_dining)
+    result = await planner.plan(date=date, budget_pp=budget, with_dining=with_dining)
     return {
         "itineraries": [
             {
@@ -39,8 +39,8 @@ def plan(date: str = Query(...), budget: float = Query(...), with_dining: bool =
 
 
 @app.get("/plan/debug")
-def plan_debug(date: str = Query(...), budget: float = Query(...), with_dining: bool = Query(False)) -> dict:
-    base_response = plan(date=date, budget=budget, with_dining=with_dining)
+async def plan_debug(date: str = Query(...), budget: float = Query(...), with_dining: bool = Query(False)) -> dict:
+    base_response = await plan(date=date, budget=budget, with_dining=with_dining)
     for itinerary in base_response["itineraries"]:
         itinerary["breakdown"] = itinerary["price"]["components"]
     base_response["meta"] = {"cache": {"fx": "disk"}}

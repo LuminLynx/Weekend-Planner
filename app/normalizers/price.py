@@ -24,19 +24,19 @@ def _parse_amount(entry: Dict, key: str) -> float:
     return float(value) if value is not None else 0.0
 
 
-def _convert_amount(fx: FXConnector, amount: float, from_currency: str, target: str) -> float:
+async def _convert_amount(fx: FXConnector, amount: float, from_currency: str, target: str) -> float:
     if from_currency == target:
         return amount
-    return fx.convert(amount, from_currency, target)
+    return await fx.convert(amount, from_currency, target)
 
 
-def calculate_price(event: Dict, *, fx: FXConnector, target_currency: str) -> PriceBreakdown:
+async def calculate_price(event: Dict, *, fx: FXConnector, target_currency: str) -> PriceBreakdown:
     price_info = event.get("price", {})
     currency = price_info.get("currency", target_currency)
     includes_vat = price_info.get("includes_vat", True)
     base_amount = float(price_info.get("amount", 0.0))
 
-    converted_base = _convert_amount(fx, base_amount, currency, target_currency)
+    converted_base = await _convert_amount(fx, base_amount, currency, target_currency)
 
     vat_rate = float(event.get("vat_rate", 0.0) or 0.0)
     vat_amount = 0.0 if includes_vat else converted_base * vat_rate
@@ -44,7 +44,7 @@ def calculate_price(event: Dict, *, fx: FXConnector, target_currency: str) -> Pr
 
     fees_amount = 0.0
     for fee in event.get("fees", []):
-        fee_amount = _convert_amount(
+        fee_amount = await _convert_amount(
             fx,
             _parse_amount(fee, "amount"),
             fee.get("currency", currency),
@@ -52,7 +52,7 @@ def calculate_price(event: Dict, *, fx: FXConnector, target_currency: str) -> Pr
         )
         fees_amount += fee_amount
 
-    promo_discount, applied_promo = _best_promo(
+    promo_discount, applied_promo = await _best_promo(
         event.get("promos", []), gross_base + fees_amount, currency, fx, target_currency
     )
 
@@ -77,7 +77,7 @@ def calculate_price(event: Dict, *, fx: FXConnector, target_currency: str) -> Pr
     )
 
 
-def _best_promo(promos: List[Dict], subtotal: float, price_currency: str, fx: FXConnector, target_currency: str) -> Tuple[float, Dict | None]:
+async def _best_promo(promos: List[Dict], subtotal: float, price_currency: str, fx: FXConnector, target_currency: str) -> Tuple[float, Dict | None]:
     best_discount = 0.0
     best = None
     for promo in promos or []:
@@ -86,7 +86,7 @@ def _best_promo(promos: List[Dict], subtotal: float, price_currency: str, fx: FX
             discount = subtotal * percent
         elif promo.get("type") == "fixed":
             currency = promo.get("currency", price_currency)
-            discount = _convert_amount(
+            discount = await _convert_amount(
                 fx,
                 float(promo.get("value", 0.0)),
                 currency,

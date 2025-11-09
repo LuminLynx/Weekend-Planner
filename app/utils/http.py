@@ -1,13 +1,14 @@
 """HTTP utilities with retries, exponential backoff, and circuit breaking."""
 from __future__ import annotations
 
-import json
+import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
 from threading import Lock
 from typing import Any, Callable, Dict, Iterable, List, Optional
-from urllib import error, parse, request
+
+import httpx
 
 LOGGER = logging.getLogger(__name__)
 
@@ -51,50 +52,53 @@ class CircuitBreaker:
 
 
 @dataclass
-class _Response:
-    status: int
-    body: bytes
-
-    def json(self) -> Dict[str, Any]:
-        if not self.body:
-            return {}
-        return json.loads(self.body.decode("utf-8"))
-
-
-@dataclass
 class HttpClient:
-    """Simple HTTP client with retries and exponential backoff."""
+    """Async HTTP client with retries and exponential backoff."""
 
     timeout: float = 5.0
     retries: int = 2
     backoff_factor: float = 0.5
     circuit_breaker: Optional[CircuitBreaker] = None
+    _client: Optional[httpx.AsyncClient] = field(default=None, init=False)
 
-    def get_json(self, url: str, params: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        response = self.request("GET", url, params=params, headers=headers)
+    def __post_init__(self) -> None:
+        self._client = None
+
+    async def __aenter__(self) -> HttpClient:
+        self._client = httpx.AsyncClient(timeout=self.timeout)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        if self._client:
+            await self._client.aclose()
+
+    async def get_json(self, url: str, params: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        response = await self.request("GET", url, params=params, headers=headers)
         return response.json()
 
-    def request(self, method: str, url: str, params: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> _Response:
+    async def request(self, method: str, url: str, params: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> httpx.Response:
         if self.circuit_breaker and not self.circuit_breaker.allow_request():
             raise RuntimeError("Circuit breaker open")
+
+        # Create client if not in context manager
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=self.timeout)
 
         attempt = 0
         last_error: Exception | None = None
         while attempt <= self.retries:
             try:
-                full_url = url
-                if params:
-                    query = parse.urlencode(params)
-                    full_url = f"{url}{'&' if '?' in url else '?'}{query}"
-                req = request.Request(full_url, method=method, headers=headers or {})
-                with request.urlopen(req, timeout=self.timeout) as response:  # noqa: S310 - controlled URL from config
-                    if response.status >= 500:
-                        raise error.HTTPError(full_url, response.status, "Server error", response.headers, None)
-                    data = response.read()
-                    if self.circuit_breaker:
-                        self.circuit_breaker.on_success()
-                    return _Response(status=response.status, body=data)
-            except (error.URLError, error.HTTPError, RuntimeError) as exc:
+                response = await self._client.request(method, url, params=params, headers=headers)
+                if response.status_code >= 500:
+                    raise httpx.HTTPStatusError(
+                        f"Server error: {response.status_code}",
+                        request=response.request,
+                        response=response
+                    )
+                if self.circuit_breaker:
+                    self.circuit_breaker.on_success()
+                return response
+            except (httpx.HTTPError, RuntimeError) as exc:
                 last_error = exc
                 if self.circuit_breaker:
                     self.circuit_breaker.on_failure()
@@ -103,24 +107,25 @@ class HttpClient:
                     raise
                 sleep_time = self.backoff_factor * (2**attempt)
                 LOGGER.warning("Request attempt %s failed (%s); retrying in %.2fs", attempt + 1, exc, sleep_time)
-                time.sleep(sleep_time)
+                await asyncio.sleep(sleep_time)
                 attempt += 1
         assert last_error is not None
         raise last_error
 
 
-def aggregate_paginated(
-    fetch_page: Callable[[int, int], List[Dict[str, Any]]],
+async def aggregate_paginated(
+    fetch_page: Callable[[int, int], Any],
     page_size: int,
-) -> Iterable[Dict[str, Any]]:
+) -> List[Dict[str, Any]]:
     """Helper to fetch and aggregate paginated responses."""
+    results = []
     page = 1
     while True:
-        payload = fetch_page(page=page, page_size=page_size)
+        payload = await fetch_page(page=page, page_size=page_size)
         if not payload:
             break
-        for item in payload:
-            yield item
+        results.extend(payload)
         if len(payload) < page_size:
             break
         page += 1
+    return results

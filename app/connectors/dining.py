@@ -26,13 +26,13 @@ class DiningConnector:
             circuit_breaker=self._circuit_breaker,
         )
 
-    def fetch(self, *, date: str, location: str | None = None) -> List[Dict]:
+    async def fetch(self, *, date: str, location: str | None = None) -> List[Dict]:
         params = {"date": date}
         if location:
             params["location"] = location
         headers = {"Authorization": f"Bearer {self.token}"} if self.token else None
         try:
-            payload = self._client.get_json(self.settings.base_url, params=params, headers=headers)
+            payload = await self._client.get_json(self.settings.base_url, params=params, headers=headers)
             options = payload.get("restaurants", [])
             LOGGER.debug("Dining provider returned %s restaurants", len(options))
             return [self._normalise(item) for item in options]

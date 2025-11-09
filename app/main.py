@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -22,12 +23,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
+async def async_main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
     planner = Planner()
-    result = planner.plan(date=args.date, budget_pp=args.budget_pp, with_dining=args.with_dining)
+    result = await planner.plan(date=args.date, budget_pp=args.budget_pp, with_dining=args.with_dining)
 
     if args.json:
         serialisable = {
@@ -61,6 +62,10 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 print(f"  Book: {option['booking_url']}")
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    return asyncio.run(async_main(argv))
 
 
 if __name__ == "__main__":
