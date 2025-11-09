@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 from dataclasses import dataclass
 from typing import Dict, List
 
@@ -15,6 +16,7 @@ from app.connectors.travel import get_travel_info
 from app.normalizers.price import calculate_price
 from app.ranking.scorer import buy_now_heuristic, days_until, score_itinerary
 from app.utils.profile import get_profile_manager
+from app.utils.metrics import record_latency
 
 
 @dataclass
@@ -36,6 +38,8 @@ class Planner:
         self.dining = DiningConnector(self.settings.connector("dining"), dining_token)
 
     async def plan(self, *, date: str, budget_pp: float, with_dining: bool = False) -> PlannerResult:
+        start_time = time.time()
+        
         # Fetch all data concurrently
         vendor_a_task = self.vendor_a.fetch(date=date)
         vendor_b_task = self.vendor_b.fetch(date=date)
@@ -112,6 +116,9 @@ class Planner:
         dining_options: List[Dict] = []
         if with_dining:
             dining_options = await self.dining.fetch(date=date)
+
+        planning_duration_ms = (time.time() - start_time) * 1000
+        record_latency("planning_duration_ms", planning_duration_ms)
 
         return PlannerResult(
             itineraries=itineraries,

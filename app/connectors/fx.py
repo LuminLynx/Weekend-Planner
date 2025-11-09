@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import Dict
 
 from app.config import FXSettings
 from app.utils.http import HttpClient
+from app.utils.metrics import record_cache_hit, record_cache_miss, record_latency
 
 LOGGER = logging.getLogger(__name__)
 CACHE_FILENAME = "fx_rates.json"
@@ -29,15 +31,21 @@ class FXConnector:
 
     async def get_rates(self) -> Dict[str, float]:
         if self._memory_cache:
+            record_cache_hit()
             return self._memory_cache
         if self._is_cache_valid():
             LOGGER.debug("Using cached FX rates from %s", self._cache_path)
             self._memory_cache = self._load_cache()
+            record_cache_hit()
             return self._memory_cache
 
+        record_cache_miss()
         params = {"base": self.settings.base_currency}
         try:
+            start_time = time.time()
             payload = await self._client.get_json(self.settings.base_url, params=params)
+            latency_ms = (time.time() - start_time) * 1000
+            record_latency("fx_live_latency_ms", latency_ms)
             rates = payload.get("rates", {})
             rates[self.settings.base_currency] = 1.0
             self._write_cache(rates)
