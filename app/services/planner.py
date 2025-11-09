@@ -10,8 +10,10 @@ from app.connectors.dining import DiningConnector
 from app.connectors.fx import FXConnector
 from app.connectors.ticket_vendor_a import TicketVendorAConnector
 from app.connectors.ticket_vendor_b import TicketVendorBConnector
+from app.connectors.travel import get_travel_info
 from app.normalizers.price import calculate_price
 from app.ranking.scorer import buy_now_heuristic, days_until, score_itinerary
+from app.utils.profile import get_profile_manager
 
 
 @dataclass
@@ -39,6 +41,11 @@ class Planner:
 
         target_currency = self.settings.app.currency
         rates = self.fx.get_rates()
+        
+        # Get user's home city from profile
+        profile_mgr = get_profile_manager()
+        profile = profile_mgr.load()
+        home_city = profile.home_city
 
         itineraries: List[Dict] = []
         for event in raw_events:
@@ -54,11 +61,24 @@ class Planner:
                     "price_drop_high_inventory_penalty": self.settings.app.price_drop_high_inventory_penalty,
                 },
             )
+            
+            # Calculate travel info
+            event_city = event.get("city")
+            distance_km = 0.0
+            co2_kg_pp = 0.0
+            if event_city and home_city:
+                travel_info = get_travel_info(home_city, event_city)
+                if travel_info:
+                    distance_km = travel_info["distance_km"]
+                    co2_kg_pp = travel_info["co2_kg_pp"]
+            
             score = score_itinerary(
                 price=price_breakdown,
                 budget_pp=budget_pp,
                 buy_now=buy_now,
                 days_to_event=event_days_to,
+                distance_km=distance_km,
+                co2_kg_pp=co2_kg_pp,
             )
             itineraries.append(
                 {
@@ -66,11 +86,14 @@ class Planner:
                     "title": event["title"],
                     "start_ts": event["start_ts"],
                     "venue": event["venue"],
+                    "city": event_city,
                     "url": event["url"],
                     "price": price_breakdown,
                     "score": score,
                     "buy_now": buy_now,
                     "buy_reason": reason,
+                    "distance_km": distance_km,
+                    "co2_kg_pp": co2_kg_pp,
                 }
             )
 
