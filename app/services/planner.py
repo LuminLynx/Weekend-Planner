@@ -24,18 +24,29 @@ class PlannerResult:
     itineraries: List[Dict]
     dining: List[Dict]
     fx_used: Dict[str, float]
+    fx_source: str = "live"
+    offline_mode: bool = False
 
 
 class Planner:
-    def __init__(self, settings: Settings | None = None) -> None:
+    def __init__(self, settings: Settings | None = None, offline_mode: bool = False) -> None:
         self.settings = settings or load_settings()
-        self.fx = FXConnector(self.settings.fx)
+        # Override with explicit offline_mode if provided
+        if offline_mode:
+            self.settings.app.offline_mode = True
+        self.fx = FXConnector(self.settings.fx, offline_mode=self.settings.app.offline_mode)
         vendor_a_token = os.getenv("VENDOR_A_TOKEN")
         vendor_b_token = os.getenv("VENDOR_B_TOKEN")
         dining_token = os.getenv("DINING_TOKEN")
-        self.vendor_a = TicketVendorAConnector(self.settings.connector("ticket_vendor_a"), vendor_a_token)
-        self.vendor_b = TicketVendorBConnector(self.settings.connector("ticket_vendor_b"), vendor_b_token)
-        self.dining = DiningConnector(self.settings.connector("dining"), dining_token)
+        self.vendor_a = TicketVendorAConnector(
+            self.settings.connector("ticket_vendor_a"), vendor_a_token, offline_mode=self.settings.app.offline_mode
+        )
+        self.vendor_b = TicketVendorBConnector(
+            self.settings.connector("ticket_vendor_b"), vendor_b_token, offline_mode=self.settings.app.offline_mode
+        )
+        self.dining = DiningConnector(
+            self.settings.connector("dining"), dining_token, offline_mode=self.settings.app.offline_mode
+        )
 
     async def plan(self, *, date: str, budget_pp: float, with_dining: bool = False) -> PlannerResult:
         start_time = time.time()
@@ -124,4 +135,6 @@ class Planner:
             itineraries=itineraries,
             dining=dining_options,
             fx_used=rates,
+            fx_source=self.fx.get_fx_source(),
+            offline_mode=self.settings.app.offline_mode,
         )

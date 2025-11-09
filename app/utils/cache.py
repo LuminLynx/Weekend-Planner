@@ -18,13 +18,14 @@ class SimpleCache:
         safe_key = key.replace("/", "_").replace(":", "_")
         return self.cache_dir / f"{safe_key}.json"
     
-    def get(self, key: str, ttl_seconds: int) -> Optional[Any]:
+    def get(self, key: str, ttl_seconds: int, ignore_ttl: bool = False) -> Optional[Any]:
         """
         Get cached value if it exists and is not expired.
         
         Args:
             key: Cache key
             ttl_seconds: Time to live in seconds
+            ignore_ttl: If True, return cached value regardless of age (for offline mode)
             
         Returns:
             Cached value or None if expired/missing
@@ -39,7 +40,10 @@ class SimpleCache:
             cached_time = datetime.fromisoformat(data["timestamp"])
             age = (datetime.now(timezone.utc) - cached_time).total_seconds()
             
-            if age < ttl_seconds:
+            if ignore_ttl:
+                print(f"[CACHE] LAST_GOOD: {key} (age={age:.1f}s, offline mode)", file=sys.stderr)
+                return data["value"]
+            elif age < ttl_seconds:
                 print(f"[CACHE] HIT: {key} (age={age:.1f}s, ttl={ttl_seconds}s)", file=sys.stderr)
                 return data["value"]
             else:

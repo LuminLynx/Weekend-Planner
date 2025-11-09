@@ -22,13 +22,14 @@ CITY_COORDS = {
 }
 
 
-async def get_weather(lat: float, lng: float) -> Optional[dict]:
+async def get_weather(lat: float, lng: float, offline_mode: bool = False) -> Optional[dict]:
     """
     Fetch weather forecast for given coordinates.
     
     Args:
         lat: Latitude
         lng: Longitude
+        offline_mode: If True, only use cached data without HTTP calls
     
     Returns:
         Weather dict with desc, temp_c, temp_min, temp_max
@@ -38,9 +39,13 @@ async def get_weather(lat: float, lng: float) -> Optional[dict]:
     cache_key = f"weather_{lat:.2f}_{lng:.2f}"
     
     # Try cache first
-    cached = cache.get(cache_key, WEATHER_CACHE_TTL)
+    cached = cache.get(cache_key, WEATHER_CACHE_TTL, ignore_ttl=offline_mode)
     if cached:
         return cached
+    
+    # In offline mode, don't make HTTP calls
+    if offline_mode:
+        return None
     
     # Fetch from Open-Meteo
     try:
@@ -83,12 +88,13 @@ async def get_weather(lat: float, lng: float) -> Optional[dict]:
         return None
 
 
-async def get_weather_by_city(city_name: str) -> Optional[dict]:
+async def get_weather_by_city(city_name: str, offline_mode: bool = False) -> Optional[dict]:
     """
     Fetch weather for a city by name.
     
     Args:
         city_name: City name (e.g., "Lisbon", "Berlin")
+        offline_mode: If True, only use cached data without HTTP calls
     
     Returns:
         Weather dict or None if city not found or fetch fails
@@ -99,7 +105,7 @@ async def get_weather_by_city(city_name: str) -> Optional[dict]:
     if not coords:
         return None
     
-    return await get_weather(coords["lat"], coords["lng"])
+    return await get_weather(coords["lat"], coords["lng"], offline_mode=offline_mode)
 
 
 def _weather_code_to_desc(code: int) -> str:

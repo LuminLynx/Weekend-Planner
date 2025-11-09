@@ -20,6 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--budget-pp", type=float, required=True, help="Budget per person")
     parser.add_argument("--with-dining", action="store_true", help="Include dining suggestions")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+    parser.add_argument("--offline", action="store_true", help="Run in offline mode using cached data")
     return parser
 
 
@@ -27,7 +28,8 @@ async def async_main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    planner = Planner()
+    # Create planner with offline mode if specified
+    planner = Planner(offline_mode=args.offline)
     result = await planner.plan(date=args.date, budget_pp=args.budget_pp, with_dining=args.with_dining)
 
     if args.json:

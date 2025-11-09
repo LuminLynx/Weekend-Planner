@@ -17,6 +17,7 @@ LOGGER = logging.getLogger(__name__)
 class DiningConnector:
     settings: ConnectorSettings
     token: str | None = None
+    offline_mode: bool = False
 
     def __post_init__(self) -> None:
         self._circuit_breaker = CircuitBreaker()
@@ -27,6 +28,11 @@ class DiningConnector:
         )
 
     async def fetch(self, *, date: str, location: str | None = None) -> List[Dict]:
+        # In offline mode, use fallback data directly
+        if self.offline_mode:
+            LOGGER.debug("OFFLINE MODE: Using bundled dining dataset")
+            return self._fallback()
+        
         params = {"date": date}
         if location:
             params["location"] = location
