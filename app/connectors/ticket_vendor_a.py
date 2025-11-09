@@ -26,14 +26,14 @@ class TicketVendorAConnector:
             circuit_breaker=self._circuit_breaker,
         )
 
-    def fetch(self, *, date: str) -> List[Dict]:
+    async def fetch(self, *, date: str) -> List[Dict]:
         page_size = self.settings.page_size or 50
 
-        def _page_loader(page: int, page_size: int) -> List[Dict]:
+        async def _page_loader(page: int, page_size: int) -> List[Dict]:
             params = {"date": date, "page": page, "page_size": page_size}
             headers = {"Authorization": f"Bearer {self.token}"} if self.token else None
             try:
-                payload = self._client.get_json(self.settings.base_url, params=params, headers=headers)
+                payload = await self._client.get_json(self.settings.base_url, params=params, headers=headers)
                 events = payload.get("events", [])
                 LOGGER.debug("Vendor A page %s returned %s events", page, len(events))
                 return events
@@ -41,7 +41,7 @@ class TicketVendorAConnector:
                 LOGGER.warning("Vendor A API unavailable (%s); using bundled dataset", exc)
                 return self._load_fallback(page=page, page_size=page_size)
 
-        raw_events = list(aggregate_paginated(_page_loader, page_size))
+        raw_events = await aggregate_paginated(_page_loader, page_size)
         return [self._normalise(event) for event in raw_events]
 
     def _load_fallback(self, *, page: int, page_size: int) -> List[Dict]:

@@ -27,7 +27,7 @@ class FXConnector:
         cache_dir.mkdir(parents=True, exist_ok=True)
         self._cache_path = cache_dir / CACHE_FILENAME
 
-    def get_rates(self) -> Dict[str, float]:
+    async def get_rates(self) -> Dict[str, float]:
         if self._memory_cache:
             return self._memory_cache
         if self._is_cache_valid():
@@ -37,7 +37,7 @@ class FXConnector:
 
         params = {"base": self.settings.base_currency}
         try:
-            payload = self._client.get_json(self.settings.base_url, params=params)
+            payload = await self._client.get_json(self.settings.base_url, params=params)
             rates = payload.get("rates", {})
             rates[self.settings.base_currency] = 1.0
             self._write_cache(rates)
@@ -51,8 +51,8 @@ class FXConnector:
             self._memory_cache = dict(self.settings.fallback_rates)
             return self._memory_cache
 
-    def convert(self, amount: float, from_currency: str, to_currency: str) -> float:
-        rates = self.get_rates()
+    async def convert(self, amount: float, from_currency: str, to_currency: str) -> float:
+        rates = await self.get_rates()
         if from_currency not in rates or to_currency not in rates:
             return amount
         base_amount = amount / rates[from_currency]

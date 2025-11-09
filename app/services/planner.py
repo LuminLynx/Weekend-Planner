@@ -1,6 +1,7 @@
 """Core planning orchestration."""
 from __future__ import annotations
 
+import asyncio
 import os
 from dataclasses import dataclass
 from typing import Dict, List
@@ -34,13 +35,22 @@ class Planner:
         self.vendor_b = TicketVendorBConnector(self.settings.connector("ticket_vendor_b"), vendor_b_token)
         self.dining = DiningConnector(self.settings.connector("dining"), dining_token)
 
-    def plan(self, *, date: str, budget_pp: float, with_dining: bool = False) -> PlannerResult:
+    async def plan(self, *, date: str, budget_pp: float, with_dining: bool = False) -> PlannerResult:
+        # Fetch all data concurrently
+        vendor_a_task = self.vendor_a.fetch(date=date)
+        vendor_b_task = self.vendor_b.fetch(date=date)
+        fx_rates_task = self.fx.get_rates()
+        
+        # Gather the vendor results and FX rates
+        vendor_a_events, vendor_b_events, rates = await asyncio.gather(
+            vendor_a_task, vendor_b_task, fx_rates_task
+        )
+        
         raw_events = []
-        raw_events.extend(self.vendor_a.fetch(date=date))
-        raw_events.extend(self.vendor_b.fetch(date=date))
+        raw_events.extend(vendor_a_events)
+        raw_events.extend(vendor_b_events)
 
         target_currency = self.settings.app.currency
-        rates = self.fx.get_rates()
         
         # Get user's home city from profile
         profile_mgr = get_profile_manager()
@@ -49,7 +59,7 @@ class Planner:
 
         itineraries: List[Dict] = []
         for event in raw_events:
-            price_breakdown = calculate_price(event, fx=self.fx, target_currency=target_currency)
+            price_breakdown = await calculate_price(event, fx=self.fx, target_currency=target_currency)
             event_days_to = days_until(event["start_ts"])
             buy_now, reason = buy_now_heuristic(
                 inventory_hint=event.get("inventory_hint", "unknown"),
@@ -101,7 +111,7 @@ class Planner:
 
         dining_options: List[Dict] = []
         if with_dining:
-            dining_options = self.dining.fetch(date=date)
+            dining_options = await self.dining.fetch(date=date)
 
         return PlannerResult(
             itineraries=itineraries,
