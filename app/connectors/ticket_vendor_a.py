@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List
 
 from app.config import ConnectorSettings
 from app.utils.http import CircuitBreaker, HttpClient, aggregate_paginated
+from app.utils.metrics import record_latency
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,7 +35,10 @@ class TicketVendorAConnector:
             params = {"date": date, "page": page, "page_size": page_size}
             headers = {"Authorization": f"Bearer {self.token}"} if self.token else None
             try:
+                start_time = time.time()
                 payload = await self._client.get_json(self.settings.base_url, params=params, headers=headers)
+                latency_ms = (time.time() - start_time) * 1000
+                record_latency("vendor_a_latency_ms", latency_ms)
                 events = payload.get("events", [])
                 LOGGER.debug("Vendor A page %s returned %s events", page, len(events))
                 return events

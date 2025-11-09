@@ -3,12 +3,13 @@ from __future__ import annotations
 
 try:  # pragma: no cover - optional dependency
     from fastapi import FastAPI, HTTPException, Query
-    from fastapi.responses import HTMLResponse
+    from fastapi.responses import HTMLResponse, PlainTextResponse
 except ImportError as exc:  # pragma: no cover - allow optional install
     raise SystemExit("fastapi must be installed to run app.server") from exc
 
 from app.services.planner import Planner
 from app.utils.share import get_share_manager, generate_html_view
+from app.utils.metrics import export_prometheus
 
 app = FastAPI(title="Weekend Planner")
 planner = Planner()
@@ -76,3 +77,17 @@ def get_share(plan_id: str) -> str:
     
     html = generate_html_view(plan_data, plan_id)
     return html
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+def metrics() -> str:
+    """
+    Return metrics in Prometheus text format.
+    
+    Exposes operational metrics including:
+    - fx_live_latency_ms: FX API call latency
+    - cache_hit_ratio: Cache hit ratio
+    - vendor_a_latency_ms: Vendor A API call latency
+    - planning_duration_ms: Planning operation duration
+    """
+    return export_prometheus()
