@@ -1,70 +1,73 @@
+"""Foreign exchange connector with simple disk caching."""
+from __future__ import annotations
 
-import httpx
 import json
-import os
-import sys
-from pathlib import Path
+import logging
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Dict
 
-FX_LAST_GOOD_PATH = Path("data/fx_last_good.json")
-FX_CACHE_TTL_SECONDS = 3600  # 1 hour
+from app.config import FXSettings
+from app.utils.http import HttpClient
 
-def _load_last_good() -> tuple[dict[str, float] | None, str]:
-    """Load last good FX rates from disk. Returns (rates, timestamp_iso)"""
-    # Ensure data directory exists
-    FX_LAST_GOOD_PATH.parent.mkdir(parents=True, exist_ok=True)
-    
-    if not FX_LAST_GOOD_PATH.exists():
-        return None, ""
-    try:
-        data = json.loads(FX_LAST_GOOD_PATH.read_text())
-        return data.get("rates"), data.get("timestamp", "")
-    except Exception:
-        return None, ""
+LOGGER = logging.getLogger(__name__)
+CACHE_FILENAME = "fx_rates.json"
+CACHE_MAX_AGE = timedelta(hours=24)
 
-def _save_last_good(rates: dict[str, float]) -> None:
-    """Save FX rates to disk with timestamp"""
-    # Ensure data directory exists
-    FX_LAST_GOOD_PATH.parent.mkdir(parents=True, exist_ok=True)
-    
-    data = {
-        "rates": rates,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
-    FX_LAST_GOOD_PATH.write_text(json.dumps(data, indent=2))
 
-async def get_fx_rates(base_url: str, ttl_seconds: int = FX_CACHE_TTL_SECONDS) -> tuple[dict[str, float], str]:
-    """
-    Fetch FX rates with fallback to last_good on failure.
-    
-    Returns:
-        (rates: dict, fx_source: str)
-        fx_source can be: "live", "last_good", "fallback_eur_only"
-    """
-    # Try to use cached last_good if fresh
-    last_good, last_ts = _load_last_good()
-    if last_good and last_ts:
+@dataclass
+class FXConnector:
+    settings: FXSettings
+    _memory_cache: Dict[str, float] = field(default_factory=dict, init=False)
+
+    def __post_init__(self) -> None:
+        self._client = HttpClient(timeout=6, retries=1)
+        cache_dir = Path("~/.weekend-planner/cache").expanduser()
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        self._cache_path = cache_dir / CACHE_FILENAME
+
+    def get_rates(self) -> Dict[str, float]:
+        if self._memory_cache:
+            return self._memory_cache
+        if self._is_cache_valid():
+            LOGGER.debug("Using cached FX rates from %s", self._cache_path)
+            self._memory_cache = self._load_cache()
+            return self._memory_cache
+
+        params = {"base": self.settings.base_currency}
         try:
-            cached_time = datetime.fromisoformat(last_ts.replace("Z", "+00:00"))
-            if (datetime.now(timezone.utc) - cached_time).total_seconds() < ttl_seconds:
-                return last_good, "cached_last_good"
-        except Exception:
-            pass
-    
-    # Try live fetch
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(base_url)
-            r.raise_for_status()
-            data = r.json()
-            rates = data.get("rates") or {}
-            rates["EUR"] = 1.0
-            _save_last_good(rates)
-            return rates, "live"
-    except (httpx.HTTPError, json.JSONDecodeError, KeyError) as e:
-        # Network error or invalid response, fallback to last_good
-        if last_good:
-            print(f"[FX] Network error, using last_good fallback: {type(e).__name__}", file=sys.stderr)
-            return last_good, "last_good"
-        # Ultimate fallback: EUR only
-        return {"EUR": 1.0}, "fallback_eur_only"
+            payload = self._client.get_json(self.settings.base_url, params=params)
+            rates = payload.get("rates", {})
+            rates[self.settings.base_currency] = 1.0
+            self._write_cache(rates)
+            self._memory_cache = rates
+            return rates
+        except Exception as exc:  # noqa: BLE001 - fallback to cached/built-in
+            LOGGER.warning("FX provider unavailable (%s); using fallback rates", exc)
+            if self._cache_path.exists():
+                self._memory_cache = self._load_cache()
+                return self._memory_cache
+            self._memory_cache = dict(self.settings.fallback_rates)
+            return self._memory_cache
+
+    def convert(self, amount: float, from_currency: str, to_currency: str) -> float:
+        rates = self.get_rates()
+        if from_currency not in rates or to_currency not in rates:
+            return amount
+        base_amount = amount / rates[from_currency]
+        return base_amount * rates[to_currency]
+
+    def _is_cache_valid(self) -> bool:
+        if not self._cache_path.exists():
+            return False
+        modified = datetime.fromtimestamp(self._cache_path.stat().st_mtime, tz=timezone.utc)
+        return datetime.now(timezone.utc) - modified < CACHE_MAX_AGE
+
+    def _load_cache(self) -> Dict[str, float]:
+        with self._cache_path.open("r", encoding="utf-8") as handle:
+            return json.load(handle)
+
+    def _write_cache(self, rates: Dict[str, float]) -> None:
+        with self._cache_path.open("w", encoding="utf-8") as handle:
+            json.dump(rates, handle)

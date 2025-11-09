@@ -1,0 +1,18 @@
+{
+  "restaurants": [
+    {
+      "id": "d-1",
+      "name": "Trattoria Luigi",
+      "price_per_person": 24.0,
+      "distance_m": 350,
+      "booking_url": "https://dining.example/trattoria-luigi"
+    },
+    {
+      "id": "d-2",
+      "name": "Vegan Bites",
+      "price_per_person": 18.5,
+      "distance_m": 120,
+      "booking_url": "https://dining.example/vegan-bites"
+    }
+  ]
+}

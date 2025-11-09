@@ -1,0 +1,87 @@
+"""Core planning orchestration."""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from typing import Dict, List
+
+from app.config import Settings, load_settings
+from app.connectors.dining import DiningConnector
+from app.connectors.fx import FXConnector
+from app.connectors.ticket_vendor_a import TicketVendorAConnector
+from app.connectors.ticket_vendor_b import TicketVendorBConnector
+from app.normalizers.price import calculate_price
+from app.ranking.scorer import buy_now_heuristic, days_until, score_itinerary
+
+
+@dataclass
+class PlannerResult:
+    itineraries: List[Dict]
+    dining: List[Dict]
+    fx_used: Dict[str, float]
+
+
+class Planner:
+    def __init__(self, settings: Settings | None = None) -> None:
+        self.settings = settings or load_settings()
+        self.fx = FXConnector(self.settings.fx)
+        vendor_a_token = os.getenv("VENDOR_A_TOKEN")
+        vendor_b_token = os.getenv("VENDOR_B_TOKEN")
+        dining_token = os.getenv("DINING_TOKEN")
+        self.vendor_a = TicketVendorAConnector(self.settings.connector("ticket_vendor_a"), vendor_a_token)
+        self.vendor_b = TicketVendorBConnector(self.settings.connector("ticket_vendor_b"), vendor_b_token)
+        self.dining = DiningConnector(self.settings.connector("dining"), dining_token)
+
+    def plan(self, *, date: str, budget_pp: float, with_dining: bool = False) -> PlannerResult:
+        raw_events = []
+        raw_events.extend(self.vendor_a.fetch(date=date))
+        raw_events.extend(self.vendor_b.fetch(date=date))
+
+        target_currency = self.settings.app.currency
+        rates = self.fx.get_rates()
+
+        itineraries: List[Dict] = []
+        for event in raw_events:
+            price_breakdown = calculate_price(event, fx=self.fx, target_currency=target_currency)
+            event_days_to = days_until(event["start_ts"])
+            buy_now, reason = buy_now_heuristic(
+                inventory_hint=event.get("inventory_hint", "unknown"),
+                days_to_event=event_days_to,
+                price_variance=0.0,
+                settings={
+                    "price_drop_days_threshold": self.settings.app.price_drop_days_threshold,
+                    "price_drop_low_inventory_bonus": self.settings.app.price_drop_low_inventory_bonus,
+                    "price_drop_high_inventory_penalty": self.settings.app.price_drop_high_inventory_penalty,
+                },
+            )
+            score = score_itinerary(
+                price=price_breakdown,
+                budget_pp=budget_pp,
+                buy_now=buy_now,
+                days_to_event=event_days_to,
+            )
+            itineraries.append(
+                {
+                    "provider": event["provider"],
+                    "title": event["title"],
+                    "start_ts": event["start_ts"],
+                    "venue": event["venue"],
+                    "url": event["url"],
+                    "price": price_breakdown,
+                    "score": score,
+                    "buy_now": buy_now,
+                    "buy_reason": reason,
+                }
+            )
+
+        itineraries.sort(key=lambda item: item["score"], reverse=True)
+
+        dining_options: List[Dict] = []
+        if with_dining:
+            dining_options = self.dining.fetch(date=date)
+
+        return PlannerResult(
+            itineraries=itineraries,
+            dining=dining_options,
+            fx_used=rates,
+        )

@@ -1,0 +1,32 @@
+{
+  "results": [
+    {
+      "event_id": "b-1",
+      "name": "Indie Gig",
+      "start": "2025-11-09T20:00:00Z",
+      "venue": "Warehouse 12",
+      "price": {"amount": 31.0, "currency": "GBP", "includes_vat": true},
+      "fees": [
+        {"label": "Handling", "amount": 1.5, "currency": "GBP"}
+      ],
+      "vat_rate": 0.15,
+      "promos": [
+        {"code": "FALL15", "type": "fixed", "value": 3.0, "currency": "GBP"},
+        {"code": "FALL15_DUP", "type": "percent", "value": 10.0}
+      ],
+      "inventory_hint": "high",
+      "url": "https://vendor-b.example/indie-gig"
+    },
+    {
+      "event_id": "b-2",
+      "name": "Classical Recital",
+      "start": "2025-11-09T18:30:00Z",
+      "venue": "City Hall",
+      "price": {"amount": 55.0, "currency": "USD", "includes_vat": false},
+      "fees": [],
+      "vat_rate": 0.07,
+      "inventory_hint": "low",
+      "url": "https://vendor-b.example/classical-recital"
+    }
+  ]
+}

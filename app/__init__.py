@@ -1,0 +1,1 @@
+"""Weekend Planner application package."""

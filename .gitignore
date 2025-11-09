@@ -46,3 +46,6 @@ fx_last_good.json
 data/
 .cache/
 *.log
+
+# Keep sample data files
+!app/data/*.json

@@ -1,143 +1,68 @@
+"""Connector implementation for ticket vendor A."""
+from __future__ import annotations
 
-# Stub connector; replace with real API mapping later.
-import httpx
-import asyncio
-import sys
-import time
-import yaml
+import json
+import logging
+from dataclasses import dataclass
 from pathlib import Path
-from ..utils.cache import get_cache
+from typing import Dict, List
 
-# Circuit breaker state
-_circuit_breaker = {
-    "failures": 0,
-    "last_failure_time": 0,
-    "state": "closed"  # closed (normal), open (failing), half_open (testing)
-}
+from app.config import ConnectorSettings
+from app.utils.http import CircuitBreaker, HttpClient, aggregate_paginated
 
-CACHE_TTL_SECONDS = 300  # 5 minutes
-MAX_FAILURES = 3
-CIRCUIT_OPEN_DURATION = 60  # seconds
+LOGGER = logging.getLogger(__name__)
 
-def _should_allow_request() -> bool:
-    """Check if circuit breaker allows request"""
-    state = _circuit_breaker["state"]
-    
-    if state == "closed":
-        return True
-    
-    if state == "open":
-        # Check if we should transition to half_open
-        if time.time() - _circuit_breaker["last_failure_time"] > CIRCUIT_OPEN_DURATION:
-            _circuit_breaker["state"] = "half_open"
-            return True
-        return False
-    
-    # half_open state
-    return True
 
-def _record_success():
-    """Record successful request"""
-    _circuit_breaker["failures"] = 0
-    _circuit_breaker["state"] = "closed"
+@dataclass
+class TicketVendorAConnector:
+    settings: ConnectorSettings
+    token: str | None = None
 
-def _record_failure():
-    """Record failed request"""
-    _circuit_breaker["failures"] += 1
-    _circuit_breaker["last_failure_time"] = time.time()
-    
-    if _circuit_breaker["failures"] >= MAX_FAILURES:
-        _circuit_breaker["state"] = "open"
-        print(f"[VENDOR_A] Circuit breaker OPEN after {_circuit_breaker['failures']} failures", 
-              file=sys.stderr)
+    def __post_init__(self) -> None:
+        self._circuit_breaker = CircuitBreaker()
+        self._client = HttpClient(
+            timeout=self.settings.timeout_seconds,
+            retries=self.settings.retries,
+            circuit_breaker=self._circuit_breaker,
+        )
 
-async def get_offers(session, event_query: dict) -> list[dict]:
-    """
-    Get offers from Vendor A with authentication, pagination, caching, and circuit breaker.
-    
-    In production, this would:
-    - Use API token from config
-    - Handle pagination for large result sets
-    - Parse real API responses through normalizers
-    - Apply circuit breaker on 5xx errors or timeouts
-    """
-    cache = get_cache()
-    cache_key = f"vendor_a_{event_query['title']}_{event_query['start_ts']}"
-    
-    # Try cache first
-    cached = cache.get(cache_key, CACHE_TTL_SECONDS)
-    if cached:
-        return cached
-    
-    # Check circuit breaker
-    if not _should_allow_request():
-        print("[VENDOR_A] Circuit breaker OPEN, using cached/fallback data", 
-              file=sys.stderr)
-        # Return cached data even if expired, or empty list
-        stale_cached = cache.get(cache_key, CACHE_TTL_SECONDS * 10)
-        return stale_cached if stale_cached else []
-    
-    # In production, this would make a real API call:
-    # try:
-    #     config = yaml.safe_load(open("app/config/settings.example.yaml"))
-    #     token = config["apis"]["vendors"]["vendor_a"]["token"]
-    #     base_url = config["apis"]["vendors"]["vendor_a"]["base_url"]
-    #     
-    #     headers = {"Authorization": f"Bearer {token}"}
-    #     all_results = []
-    #     page = 1
-    #     
-    #     while True:
-    #         response = await session.get(
-    #             f"{base_url}/events/search",
-    #             params={"query": event_query["title"], "page": page},
-    #             headers=headers,
-    #             timeout=10
-    #         )
-    #         response.raise_for_status()
-    #         data = response.json()
-    #         all_results.extend(normalize_vendor_a_response(data["results"]))
-    #         
-    #         if not data.get("has_more"):
-    #             break
-    #         page += 1
-    #     
-    #     _record_success()
-    #     cache.set(cache_key, all_results)
-    #     return all_results
-    #     
-    # except (httpx.HTTPStatusError, httpx.TimeoutException) as e:
-    #     if isinstance(e, httpx.HTTPStatusError) and e.response.status_code >= 500:
-    #         _record_failure()
-    #     # Fallback to stale cache or empty
-    #     stale_cached = cache.get(cache_key, CACHE_TTL_SECONDS * 10)
-    #     return stale_cached if stale_cached else []
-    
-    # For now, return stub data
-    try:
-        # Simulate occasional failures for circuit breaker testing
-        # In production, this would be real API call
-        results = [
-            {
-                "provider": "a",
-                "title": event_query["title"],
-                "start_ts": event_query["start_ts"],
-                "venue": {"lat": 38.709, "lng": -9.133, "address": "Lisbon"},
-                "price": {"amount": 22.0, "currency": "EUR", "includes_vat": True},
-                "fees": [{"type": "service", "amount": 2.5, "currency": "EUR"}],
-                "vat_rate": 0.23,
-                "promos": ["STUDENT10"],
-                "inventory_hint": "med",
-                "url": "https://vendor-a.example/tickets/abc",
-                "source_id": "a-abc"
-            }
-        ]
-        _record_success()
-        cache.set(cache_key, results)
-        return results
-    except Exception as e:
-        _record_failure()
-        print(f"[VENDOR_A] Error: {e}", file=sys.stderr)
-        # Return stale cache or empty
-        stale_cached = cache.get(cache_key, CACHE_TTL_SECONDS * 10)
-        return stale_cached if stale_cached else []
+    def fetch(self, *, date: str) -> List[Dict]:
+        page_size = self.settings.page_size or 50
+
+        def _page_loader(page: int, page_size: int) -> List[Dict]:
+            params = {"date": date, "page": page, "page_size": page_size}
+            headers = {"Authorization": f"Bearer {self.token}"} if self.token else None
+            try:
+                payload = self._client.get_json(self.settings.base_url, params=params, headers=headers)
+                events = payload.get("events", [])
+                LOGGER.debug("Vendor A page %s returned %s events", page, len(events))
+                return events
+            except Exception as exc:  # noqa: BLE001 - we want fallback behaviour
+                LOGGER.warning("Vendor A API unavailable (%s); using bundled dataset", exc)
+                return self._load_fallback(page=page, page_size=page_size)
+
+        raw_events = list(aggregate_paginated(_page_loader, page_size))
+        return [self._normalise(event) for event in raw_events]
+
+    def _load_fallback(self, *, page: int, page_size: int) -> List[Dict]:
+        data_path = Path(__file__).resolve().parent.parent / "data" / "vendor_a.json"
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+        events = payload.get("events", [])
+        start = (page - 1) * page_size
+        end = start + page_size
+        return events[start:end]
+
+    def _normalise(self, event: Dict) -> Dict:
+        promos = event.get("promos", [])
+        return {
+            "provider": "vendor_a",
+            "title": event.get("title"),
+            "start_ts": event.get("start"),
+            "venue": event.get("venue"),
+            "price": event.get("price", {}),
+            "fees": event.get("fees", []),
+            "vat_rate": event.get("vat_rate"),
+            "promos": promos,
+            "inventory_hint": event.get("inventory_hint", "unknown"),
+            "url": event.get("url"),
+        }
