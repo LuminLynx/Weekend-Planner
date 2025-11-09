@@ -48,6 +48,8 @@ def score_itinerary(
     budget_pp: float,
     buy_now: bool,
     days_to_event: int,
+    distance_km: float = 0.0,
+    co2_kg_pp: float = 0.0,
 ) -> float:
     if budget_pp <= 0:
         affordability_score = 0.2
@@ -61,6 +63,12 @@ def score_itinerary(
 
     urgency_bonus = 0.15 if buy_now else 0.0
     timeline_bonus = max(0.0, 0.15 - min(days_to_event / 40.0, 0.15))
+    
+    # Distance penalty: -0.01 per 500km (max -0.10)
+    distance_penalty = min(0.10, (distance_km / 500.0) * 0.01)
+    
+    # CO2 penalty: -0.01 per 10kg (max -0.10)
+    co2_penalty = min(0.10, (co2_kg_pp / 10.0) * 0.01)
 
-    score = max(0.0, min(1.0, affordability_score + urgency_bonus + timeline_bonus))
+    score = max(0.0, min(1.0, affordability_score + urgency_bonus + timeline_bonus - distance_penalty - co2_penalty))
     return round(score, 4)

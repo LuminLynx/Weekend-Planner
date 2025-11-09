@@ -59,6 +59,7 @@ class TicketVendorAConnector:
             "title": event.get("title"),
             "start_ts": event.get("start"),
             "venue": event.get("venue"),
+            "city": event.get("city"),
             "price": event.get("price", {}),
             "fees": event.get("fees", []),
             "vat_rate": event.get("vat_rate"),

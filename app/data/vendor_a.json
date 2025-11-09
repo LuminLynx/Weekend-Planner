@@ -5,6 +5,7 @@
       "title": "Jazz Night",
       "start": "2025-11-09T19:00:00Z",
       "venue": "Blue Note",
+      "city": "Paris",
       "price": {"amount": 42.0, "currency": "EUR", "includes_vat": true},
       "fees": [
         {"label": "Service", "amount": 2.5, "currency": "EUR"}
@@ -18,6 +19,7 @@
       "title": "Comedy Showcase",
       "start": "2025-11-09T21:00:00Z",
       "venue": "Laugh Factory",
+      "city": "Lisbon",
       "price": {"amount": 28.0, "currency": "EUR", "includes_vat": false},
       "fees": [
         {"label": "Booking", "amount": 3.0, "currency": "EUR"},

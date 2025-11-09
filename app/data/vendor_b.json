@@ -5,6 +5,7 @@
       "name": "Indie Gig",
       "start": "2025-11-09T20:00:00Z",
       "venue": "Warehouse 12",
+      "city": "London",
       "price": {"amount": 31.0, "currency": "GBP", "includes_vat": true},
       "fees": [
         {"label": "Handling", "amount": 1.5, "currency": "GBP"}
@@ -22,6 +23,7 @@
       "name": "Classical Recital",
       "start": "2025-11-09T18:30:00Z",
       "venue": "City Hall",
+      "city": "Berlin",
       "price": {"amount": 55.0, "currency": "USD", "includes_vat": false},
       "fees": [],
       "vat_rate": 0.07,
