@@ -29,6 +29,24 @@ python app/main.py --date 2025-11-02 --budget-pp 30 --with-dining
 uvicorn app.server:app --host 0.0.0.0 --port 8000
 ```
 
+#### Offline Mode
+Run the planner without internet using cached data:
+```bash
+# Using CLI flag
+python app/main.py --date 2025-11-02 --budget-pp 30 --offline
+
+# Using environment variable
+OFFLINE_MODE=true python app/main.py --date 2025-11-02 --budget-pp 30
+
+# For server
+OFFLINE_MODE=true uvicorn app.server:app --host 0.0.0.0 --port 8000
+```
+
+When offline mode is enabled:
+- All HTTP calls are skipped
+- Last cached data is used (FX rates, event listings, etc.)
+- The `/plan/debug` endpoint exposes `debug.offline=true` and `fx_source="last_good"`
+
 ### Deployment Options
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for comprehensive deployment options including:
 - ✅ GitHub Pages (current live deployment)
