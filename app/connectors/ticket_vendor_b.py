@@ -17,6 +17,7 @@ LOGGER = logging.getLogger(__name__)
 class TicketVendorBConnector:
     settings: ConnectorSettings
     token: str | None = None
+    offline_mode: bool = False
 
     def __post_init__(self) -> None:
         self._circuit_breaker = CircuitBreaker()
@@ -30,6 +31,11 @@ class TicketVendorBConnector:
         page_size = self.settings.page_size or 50
 
         async def _page_loader(page: int, page_size: int) -> List[Dict]:
+            # In offline mode, use fallback data directly
+            if self.offline_mode:
+                LOGGER.debug("OFFLINE MODE: Using bundled vendor B dataset")
+                return self._load_fallback(page=page, page_size=page_size)
+            
             params = {"date": date, "page": page, "limit": page_size}
             headers = {"X-Api-Key": self.token} if self.token else None
             try:

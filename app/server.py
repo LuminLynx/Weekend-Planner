@@ -1,6 +1,8 @@
 """FastAPI application exposing planning endpoints."""
 from __future__ import annotations
 
+import os
+
 try:  # pragma: no cover - optional dependency
     from fastapi import FastAPI, HTTPException, Query
     from fastapi.responses import HTMLResponse, PlainTextResponse
@@ -12,7 +14,13 @@ from app.utils.share import get_share_manager, generate_html_view
 from app.utils.metrics import export_prometheus
 
 app = FastAPI(title="Weekend Planner")
-planner = Planner()
+
+def _get_offline_mode() -> bool:
+    """Check if offline mode is enabled via environment variable."""
+    offline_env = os.getenv("OFFLINE_MODE", "").lower()
+    return offline_env in {"true", "1", "yes"}
+
+planner = Planner(offline_mode=_get_offline_mode())
 
 
 @app.get("/healthz")
@@ -44,6 +52,14 @@ async def plan_debug(date: str = Query(...), budget: float = Query(...), with_di
     base_response = await plan(date=date, budget=budget, with_dining=with_dining)
     for itinerary in base_response["itineraries"]:
         itinerary["breakdown"] = itinerary["price"]["components"]
+    
+    # Get fresh planner result to access metadata
+    result = await planner.plan(date=date, budget_pp=budget, with_dining=with_dining)
+    
+    base_response["debug"] = {
+        "offline": result.offline_mode,
+        "fx_source": result.fx_source,
+    }
     base_response["meta"] = {"cache": {"fx": "disk"}}
     return base_response
 

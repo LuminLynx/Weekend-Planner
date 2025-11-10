@@ -29,6 +29,7 @@ class AppSettings:
     price_drop_low_inventory_bonus: float = 0.25
     price_drop_high_inventory_penalty: float = -0.1
     cache_dir: str = "~/.weekend-planner/cache"
+    offline_mode: bool = False
 
 
 @dataclass
@@ -134,6 +135,11 @@ def load_settings(settings_path: str | Path | None = None) -> Settings:
         )
 
     settings.app.cache_dir = _expand_path(settings.app.cache_dir)
+    
+    # Check for offline mode from environment variable
+    offline_env = os.getenv("OFFLINE_MODE", "").lower()
+    if offline_env in {"true", "1", "yes"}:
+        settings.app.offline_mode = True
 
     return settings
 

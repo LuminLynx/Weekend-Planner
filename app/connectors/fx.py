@@ -21,7 +21,9 @@ CACHE_MAX_AGE = timedelta(hours=24)
 @dataclass
 class FXConnector:
     settings: FXSettings
+    offline_mode: bool = False
     _memory_cache: Dict[str, float] = field(default_factory=dict, init=False)
+    _fx_source: str = field(default="live", init=False)
 
     def __post_init__(self) -> None:
         self._client = HttpClient(timeout=6, retries=1)
@@ -33,9 +35,25 @@ class FXConnector:
         if self._memory_cache:
             record_cache_hit()
             return self._memory_cache
+        
+        # In offline mode, use last good cached data without checking TTL
+        if self.offline_mode:
+            if self._cache_path.exists():
+                LOGGER.debug("OFFLINE MODE: Using last good FX rates from %s", self._cache_path)
+                self._memory_cache = self._load_cache()
+                self._fx_source = "last_good"
+                record_cache_hit()
+                return self._memory_cache
+            else:
+                LOGGER.warning("OFFLINE MODE: No cached FX data available, using fallback rates")
+                self._memory_cache = dict(self.settings.fallback_rates)
+                self._fx_source = "last_good"
+                return self._memory_cache
+        
         if self._is_cache_valid():
             LOGGER.debug("Using cached FX rates from %s", self._cache_path)
             self._memory_cache = self._load_cache()
+            self._fx_source = "cached"
             record_cache_hit()
             return self._memory_cache
 
@@ -50,13 +68,16 @@ class FXConnector:
             rates[self.settings.base_currency] = 1.0
             self._write_cache(rates)
             self._memory_cache = rates
+            self._fx_source = "live"
             return rates
         except Exception as exc:  # noqa: BLE001 - fallback to cached/built-in
             LOGGER.warning("FX provider unavailable (%s); using fallback rates", exc)
             if self._cache_path.exists():
                 self._memory_cache = self._load_cache()
+                self._fx_source = "last_good"
                 return self._memory_cache
             self._memory_cache = dict(self.settings.fallback_rates)
+            self._fx_source = "last_good"
             return self._memory_cache
 
     async def convert(self, amount: float, from_currency: str, to_currency: str) -> float:
@@ -79,3 +100,7 @@ class FXConnector:
     def _write_cache(self, rates: Dict[str, float]) -> None:
         with self._cache_path.open("w", encoding="utf-8") as handle:
             json.dump(rates, handle)
+    
+    def get_fx_source(self) -> str:
+        """Get the FX source for debug information."""
+        return self._fx_source
